@@ -2,9 +2,6 @@
   "version": 2,
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/(.*)", "destination": "/public/index.html" }
-  ],
-  "env": {
-    "ADMIN_EMAIL": "shusensei27@gmail.com"
-  }
+    { "source": "/(.*)", "destination": "/public/$1" }
+  ]
 }
