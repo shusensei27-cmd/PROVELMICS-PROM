@@ -28,12 +28,12 @@ const State = {
 };
 
 // ── Supabase Init ────────────────────────────────────────────
-let supabase = null;
+let supabaseClient = null;
 
 function initSupabase() {
   if (window.supabase && CONFIG.SUPABASE_URL !== 'https://YOUR_SUPABASE_PROJECT.supabase.co') {
-    supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
-    supabase.auth.onAuthStateChange(async (event, session) => {
+    supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    supabaseClient.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         State.user = session.user;
         State.token = session.access_token;
@@ -67,15 +67,15 @@ async function api(path, options = {}) {
 
 // ── Auth ─────────────────────────────────────────────────────
 async function loginWithGoogle() {
-  if (!supabase) return showToast('Supabase not configured. Set your credentials in app.js', 'error');
-  await supabase.auth.signInWithOAuth({
+  if (!supabaseClient) return showToast('Supabase not configured. Set your credentials in app.js', 'error');
+  await supabaseClient.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin }
   });
 }
 
 async function logout() {
-  if (supabase) await supabase.auth.signOut();
+  if (supabaseClient) await supabaseClient.auth.signOut();
   State.user = null;
   State.token = null;
   State.dbUser = null;
@@ -343,7 +343,6 @@ async function showAuthorDetail(id) {
   try {
     const data = await api(`/authors?id=${id}`);
     const { author } = data;
-    const modal = document.getElementById('author-modal');
     const content = document.getElementById('author-modal-content');
     const initials = (author.display_name||'A').charAt(0).toUpperCase();
 
@@ -410,13 +409,11 @@ async function loadProfile() {
       el('profile-role').style.display = 'block';
     }
 
-    // Fill edit form
     if (el('edit-display-name')) el('edit-display-name').value = p.display_name || '';
     if (el('edit-pen-name')) el('edit-pen-name').value = p.pen_name || '';
     if (el('edit-bio')) el('edit-bio').value = p.bio || '';
     if (el('edit-photo-url')) el('edit-photo-url').value = p.photo_url || '';
 
-    // Load bookmarks
     loadBookmarks();
   } catch (e) {
     showToast('Failed to load profile', 'error');
@@ -490,7 +487,6 @@ async function loadReader(id, type) {
       renderComicReader(item);
     }
 
-    // Load user rating
     if (State.user) {
       try {
         const rData = await api(`/ratings?content_id=${id}&content_type=${type}`);
@@ -785,7 +781,6 @@ function onSearchInput(e) {
       const data = await api(`/search?q=${encodeURIComponent(q)}`);
       renderSearchResults(data.results || [], dropdown);
 
-      // Save to history
       if (!State.searchHistory.includes(q)) {
         State.searchHistory.unshift(q);
         State.searchHistory = State.searchHistory.slice(0, 10);
@@ -816,7 +811,6 @@ function renderSearchResults(results, dropdown) {
   dropdown.classList.add('open');
 }
 
-// Close search on outside click
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.nav-search')) {
     document.getElementById('search-results')?.classList.remove('open');
@@ -890,7 +884,6 @@ function closeModal(id) {
   document.body.style.overflow = '';
 }
 
-// Close modal on backdrop click
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('modal-backdrop')) closeModal(e.target.id);
 });
@@ -928,10 +921,8 @@ document.addEventListener('DOMContentLoaded', () => {
   buildGenreList();
   navigateTo('home');
 
-  // Burger overlay click
   document.getElementById('mobile-overlay')?.addEventListener('click', toggleBurger);
 
-  // Keyboard shortcuts
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-backdrop.open').forEach(m => closeModal(m.id));
