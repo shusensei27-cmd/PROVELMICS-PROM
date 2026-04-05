@@ -4,8 +4,8 @@
 
 // ── Config ──────────────────────────────────────────────────
 const CONFIG = {
-  SUPABASE_URL: 'https://YOUR_SUPABASE_PROJECT.supabase.co',
-  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
+  SUPABASE_URL: 'https://erlolklvtjvgblggqhjf.supabase.co',
+  SUPABASE_ANON_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVybG9sa2x2dGp2Z2JsZ2dxaGpmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzODAyMTUsImV4cCI6MjA5MDk1NjIxNX0.Mt5XxOAH4GMkzXlc_fQhtAryqDFiroyeri1I65T4LjY',
   API_BASE: '/api',
   ADMIN_EMAIL: 'shusensei27@gmail.com',
 };
