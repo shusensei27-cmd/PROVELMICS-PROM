@@ -1,13 +1,24 @@
 {
-  "functions": {
-    "api/**/*.js": {
-      "runtime": "nodejs18.x"
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
-  },
-  "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/css/(.*)", "destination": "/public/css/$1" },
-    { "source": "/js/(.*)", "destination": "/public/js/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ]
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/public/$1" }
+  ],
+  "env": {
+    "SUPABASE_JWT_SECRET": "@supabase_jwt_secret",
+    "CLOUDFLARE_ACCOUNT_ID": "@cloudflare_account_id",
+    "CLOUDFLARE_D1_DATABASE_ID": "@cloudflare_d1_database_id",
+    "CLOUDFLARE_API_TOKEN": "@cloudflare_api_token",
+    "ADMIN_EMAIL": "shusensei27@gmail.com"
+  }
 }
