@@ -10,6 +10,7 @@ module.exports = async function handler(req, res) {
 
   const admin = requireAdmin(req, res);
   if (!admin) return;
+  console.log('[DEBUG] Isi payload admin:', JSON.stringify(admin, null, 2));
 
   if (req.method === 'GET') {
     try {
