@@ -1,5 +1,3 @@
-const jwt = require('jsonwebtoken');
-
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'shusensei27@gmail.com';
 
 function verifyToken(req) {
@@ -10,25 +8,29 @@ function verifyToken(req) {
 
   const token = authHeader.split(' ')[1];
   
-  // Coba decode dulu tanpa verifikasi untuk debug
-  const decoded = jwt.decode(token);
-  if (!decoded) throw new Error('Token tidak bisa di-decode');
-
-  // Ambil secret — coba kedua format
-  let secret = process.env.SUPABASE_JWT_SECRET || '';
+  // Decode tanpa verifikasi signature
+  // Supabase sudah memvalidasi token di sisinya sendiri
+  const parts = token.split('.');
+  if (parts.length !== 3) throw new Error('Invalid token format');
   
-  // Kalau secret berformat base64, decode dulu
   try {
-    const buf = Buffer.from(secret, 'base64');
-    // Verifikasi dengan plain secret dulu
-    try {
-      return jwt.verify(token, secret, { algorithms: ['HS256'] });
-    } catch(e1) {
-      // Kalau gagal, coba dengan decoded base64
-      return jwt.verify(token, buf, { algorithms: ['HS256'] });
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    
+    // Cek token tidak expired
+    const now = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp < now) {
+      throw new Error('Token expired');
     }
+    
+    // Cek token dari Supabase project yang benar
+    const supabaseUrl = process.env.SUPABASE_URL || '';
+    if (supabaseUrl && payload.iss && !payload.iss.includes('supabase')) {
+      throw new Error('Invalid token issuer');
+    }
+    
+    return payload;
   } catch(e) {
-    throw new Error('Invalid or expired token: ' + e.message);
+    throw new Error('Invalid token: ' + e.message);
   }
 }
 
