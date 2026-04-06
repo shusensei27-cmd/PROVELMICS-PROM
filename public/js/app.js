@@ -104,12 +104,10 @@ function updateAuthUI() {
   if (State.user) {
     loginBtn && loginBtn.classList.add('hidden');
     userMenu && userMenu.classList.remove('hidden');
-    if (userAvatar) {
-      const photo = State.dbUser?.photo_url || State.user.user_metadata?.avatar_url;
-      if (photo) {
-        userAvatar.src = photo;
-        userAvatar.style.display = 'block';
-      }
+    const photo = State.dbUser?.photo_url || State.user.user_metadata?.avatar_url;
+    if (photo && userAvatar) {
+      userAvatar.src = photo;
+      userAvatar.style.display = 'block';
     }
     const isAdmin = State.user.email === CONFIG.ADMIN_EMAIL;
     adminLink && (adminLink.style.display = isAdmin ? 'block' : 'none');
@@ -916,6 +914,117 @@ function switchTab(groupId, tabId) {
 }
 
 // ── Init ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// TAMBAHKAN FUNGSI-FUNGSI INI DI AKHIR app.js
+// (sebelum baris terakhir yang ada DOMContentLoaded)
+// ═══════════════════════════════════════════════════════════
+
+// ── Mobile Search ────────────────────────────────────────────
+function toggleMobileSearch() {
+  const overlay = document.getElementById('mobile-search-overlay');
+  const input = document.getElementById('mobile-search-input');
+  overlay?.classList.toggle('open');
+  if (overlay?.classList.contains('open')) {
+    setTimeout(() => input?.focus(), 100);
+  }
+}
+
+function onMobileSearchInput(e) {
+  const q = e.target.value.trim();
+  const dropdown = document.getElementById('mobile-search-results');
+
+  clearTimeout(searchDebounce);
+  if (q.length < 2) { dropdown && dropdown.classList.remove('open'); return; }
+
+  searchDebounce = setTimeout(async () => {
+    try {
+      const data = await api(`/search?q=${encodeURIComponent(q)}`);
+      renderSearchResults(data.results || [], dropdown);
+    } catch (e) {
+      if (dropdown) dropdown.classList.remove('open');
+    }
+  }, 300);
+}
+
+// Close mobile search on outside click
+document.addEventListener('click', (e) => {
+  const overlay = document.getElementById('mobile-search-overlay');
+  const btn = document.getElementById('mobile-search-btn');
+  if (overlay?.classList.contains('open') &&
+      !overlay.contains(e.target) &&
+      e.target !== btn) {
+    overlay.classList.remove('open');
+  }
+});
+
+// ── Nav scroll effect ────────────────────────────────────────
+window.addEventListener('scroll', () => {
+  const nav = document.getElementById('main-nav');
+  if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
+}, { passive: true });
+
+// ── GANTI fungsi updateAuthUI yang lama dengan ini ───────────
+function updateAuthUI() {
+  const loginBtn = document.getElementById('login-btn');
+  const userMenu = document.getElementById('user-menu');
+  const userAvatar = document.getElementById('user-avatar');
+  const adminLink = document.getElementById('admin-link');
+  const mobileAdminLink = document.getElementById('mobile-admin-link');
+
+  // Mobile menu elements
+  const mobileUserInfo = document.getElementById('mobile-user-info');
+  const mobileActionBtns = document.getElementById('mobile-action-btns');
+  const mobileLoginSection = document.getElementById('mobile-login-section');
+  const mobileUserAvatar = document.getElementById('mobile-user-avatar');
+  const mobileUserName = document.getElementById('mobile-user-name');
+  const mobileUserEmail = document.getElementById('mobile-user-email');
+
+  if (State.user) {
+    // Desktop
+    loginBtn && loginBtn.classList.add('hidden');
+    userMenu && userMenu.classList.remove('hidden');
+
+    const photo = State.dbUser?.photo_url || State.user.user_metadata?.avatar_url;
+    if (photo && userAvatar) {
+      userAvatar.src = photo;
+      userAvatar.style.display = 'block';
+    }
+
+    // Mobile menu — tampilkan info user
+    mobileUserInfo && mobileUserInfo.classList.remove('hidden');
+    mobileActionBtns && mobileActionBtns.classList.remove('hidden');
+    if (mobileLoginSection) mobileLoginSection.style.display = 'none';
+
+    if (photo && mobileUserAvatar) {
+      mobileUserAvatar.src = photo;
+      mobileUserAvatar.style.display = 'block';
+    }
+
+    const name = State.dbUser?.display_name || State.user.user_metadata?.full_name || 'User';
+    const email = State.user.email || '';
+    if (mobileUserName) mobileUserName.textContent = name;
+    if (mobileUserEmail) mobileUserEmail.textContent = email;
+
+    // Admin link
+    const isAdmin = State.user.email === CONFIG.ADMIN_EMAIL;
+    adminLink && (adminLink.style.display = isAdmin ? 'block' : 'none');
+    mobileAdminLink && (mobileAdminLink.style.display = isAdmin ? 'block' : 'none');
+
+  } else {
+    // Desktop
+    loginBtn && loginBtn.classList.remove('hidden');
+    userMenu && userMenu.classList.add('hidden');
+
+    // Mobile menu — tampilkan tombol login
+    mobileUserInfo && mobileUserInfo.classList.add('hidden');
+    mobileActionBtns && mobileActionBtns.classList.add('hidden');
+    if (mobileLoginSection) mobileLoginSection.style.display = 'block';
+
+    adminLink && (adminLink.style.display = 'none');
+    mobileAdminLink && (mobileAdminLink.style.display = 'none');
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initSupabase();
   buildGenreList();
