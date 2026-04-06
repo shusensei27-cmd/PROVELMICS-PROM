@@ -10,9 +10,11 @@ module.exports = async function handler(req, res) {
 
   const admin = requireAdmin(req, res);
   if (!admin) return;
-
-  // TEMPORARY DEBUG — hapus setelah selesai
-  console.log('Admin payload:', JSON.stringify(admin));
+  
+  console.log('[DEBUG] Admin check passed, fetching data...');
+  
+  // ... kode selanjutnya
+  console.log('[DEBUG] Data fetched:', JSON.stringify(data));
 
   if (req.method === 'GET') {
     try {
