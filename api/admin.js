@@ -10,8 +10,6 @@ module.exports = async function handler(req, res) {
 
   const admin = requireAdmin(req, res);
   if (!admin) return;
-  const admin = requireAdmin(req, res);
-  if (!admin) return;
 
   // TEMPORARY DEBUG — hapus setelah selesai
   console.log('Admin payload:', JSON.stringify(admin));
