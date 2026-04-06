@@ -39,15 +39,18 @@ function requireAuth(req, res) {
 }
 
 function isAdmin(user) {
-  // Cek semua kemungkinan lokasi email di JWT payload Supabase
-  const email = user?.email || 
-                user?.user_metadata?.email || 
-                user?.app_metadata?.email ||
-                '';
-  console.log('Checking admin for email:', email, '| ADMIN_EMAIL:', ADMIN_EMAIL);
-  return email === ADMIN_EMAIL;
+  const email = (
+    user?.email || 
+    user?.user_metadata?.email || 
+    user?.app_metadata?.email || 
+    ''
+  ).trim().toLowerCase();
+  
+  const adminEmail = (ADMIN_EMAIL || '').trim().toLowerCase();
+  
+  console.log('Email check:', email, '===', adminEmail, ':', email === adminEmail);
+  return email === adminEmail;
 }
-
 function requireAdmin(req, res) {
   const user = requireAuth(req, res);
   if (!user) return null;
