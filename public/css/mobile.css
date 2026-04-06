@@ -1,0 +1,392 @@
+/* ═══════════════════════════════════════════════════════════
+   PROVELMICS — Mobile Optimizations & UI Fixes
+   Tambahkan ini di akhir main.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Foto profil bulat ── */
+.user-avatar {
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--accent-gold);
+  object-fit: cover;
+  cursor: pointer;
+  transition: var(--transition);
+  border-radius: 50% !important;
+  box-shadow: 0 0 0 2px var(--bg-void);
+}
+
+.user-avatar:hover {
+  box-shadow: 0 0 0 2px var(--bg-void), var(--glow-gold);
+}
+
+.profile-avatar {
+  border-radius: 50% !important;
+}
+
+.author-photo {
+  border-radius: 50% !important;
+}
+
+/* ── Burger button — selalu tampil di mobile ── */
+@media (max-width: 900px) {
+  .burger-btn {
+    display: flex !important;
+  }
+
+  /* Nav layout di mobile */
+  .nav {
+    padding: 0 1rem;
+    gap: 0.5rem;
+  }
+
+  .nav-logo {
+    font-size: 1.1rem;
+  }
+
+  /* Sembunyikan tombol auth di nav saat mobile, tampilkan di burger menu */
+  #login-btn {
+    display: none !important;
+  }
+
+  #user-menu {
+    display: none !important;
+  }
+}
+
+/* ── Search bar mobile — jadi icon toggle ── */
+.nav-search-mobile-btn {
+  display: none;
+  background: none;
+  border: 1px solid var(--border-glow);
+  color: var(--accent-gold);
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+.nav-search-mobile-btn:hover {
+  background: rgba(201, 168, 76, 0.1);
+  box-shadow: var(--glow-gold);
+}
+
+@media (max-width: 900px) {
+  .nav-search {
+    display: none;
+  }
+
+  .nav-search-mobile-btn {
+    display: flex;
+  }
+}
+
+/* Search overlay fullscreen di mobile */
+.mobile-search-overlay {
+  position: fixed;
+  top: var(--nav-height);
+  left: 0;
+  right: 0;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border-glow);
+  padding: 0.75rem 1rem;
+  z-index: 997;
+  display: none;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+.mobile-search-overlay.open {
+  display: block;
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.mobile-search-overlay input {
+  width: 100%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-glow);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 0.65rem 1rem;
+  outline: none;
+  border-radius: var(--radius-sm);
+}
+
+.mobile-search-overlay input:focus {
+  border-color: var(--accent-gold);
+}
+
+.mobile-search-results {
+  margin-top: 0.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* ── Spotify/Music player — lebih rapi di mobile ── */
+.spotify-player {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  z-index: 500;
+  border: 1px solid var(--border-glow);
+  border-bottom: none;
+  overflow: hidden;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: var(--glow-gold), 0 -4px 20px rgba(0,0,0,0.4);
+  transform: translateY(0);
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.spotify-player.collapsed {
+  transform: translateY(calc(100% - 40px));
+}
+
+.spotify-toggle {
+  background: var(--bg-elevated);
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--accent-gold);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  padding: 0 1rem;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.spotify-toggle:hover {
+  background: rgba(201, 168, 76, 0.08);
+}
+
+@media (max-width: 600px) {
+  .spotify-player {
+    max-width: 100%;
+    border-left: none;
+    border-right: none;
+  }
+
+  .spotify-player iframe {
+    width: 100% !important;
+  }
+}
+
+/* ── Mobile menu — tampilkan info login ── */
+.mobile-menu-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-glow);
+  border-radius: var(--radius-sm);
+  margin-bottom: 0.5rem;
+}
+
+.mobile-menu-user img {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--accent-gold);
+  object-fit: cover;
+}
+
+.mobile-menu-user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-menu-user-name {
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobile-menu-user-email {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Tombol aksi di mobile menu ── */
+.mobile-menu-actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.mobile-menu-actions .btn {
+  flex: 1;
+  justify-content: center;
+  font-size: 0.62rem;
+  padding: 0.5rem;
+}
+
+/* ── Card grid mobile ── */
+@media (max-width: 480px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  .card-body {
+    padding: 0.6rem;
+  }
+
+  .card-title {
+    font-size: 0.75rem;
+  }
+
+  .featured-strip {
+    gap: 0.75rem;
+  }
+
+  .featured-card {
+    width: 260px;
+    height: 160px;
+  }
+}
+
+/* ── Hero mobile ── */
+@media (max-width: 600px) {
+  .hero {
+    min-height: 70vh;
+    padding-bottom: 2rem;
+  }
+
+  .hero-actions {
+    flex-direction: column;
+  }
+
+  .hero-actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .section { padding: 2.5rem 0; }
+  .section-sm { padding: 1.5rem 0; }
+}
+
+/* ── Profile header mobile ── */
+@media (max-width: 600px) {
+  .profile-header {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.5rem 1rem;
+    gap: 1rem;
+  }
+
+  .profile-role-badge {
+    margin-left: 0;
+    align-self: center;
+  }
+}
+
+/* ── Admin stats mobile ── */
+@media (max-width: 480px) {
+  .admin-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-value {
+    font-size: 1.6rem;
+  }
+}
+
+/* ── Toast mobile — di atas musik player ── */
+@media (max-width: 600px) {
+  .toast-container {
+    bottom: 50px;
+    left: 1rem;
+    right: 1rem;
+  }
+
+  .toast {
+    max-width: 100%;
+  }
+}
+
+/* ── Fix burger button always visible ── */
+.burger-btn {
+  display: none;
+  background: none;
+  border: 1px solid var(--border-glow);
+  cursor: pointer;
+  padding: 0;
+  flex-direction: column;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition);
+  flex-shrink: 0;
+}
+
+/* Selalu tampil di tablet dan HP */
+@media (max-width: 1024px) {
+  .burger-btn {
+    display: flex !important;
+  }
+}
+
+/* ── Nav scrolled state ── */
+.nav.scrolled {
+  background: rgba(5, 5, 8, 0.98);
+  border-bottom-color: var(--border-glow);
+}
+
+/* ── Smooth page transitions ── */
+.page {
+  display: none;
+  animation: fadeIn 0.25s ease;
+}
+
+.page.active {
+  display: block;
+}
+
+/* ── Bottom safe area untuk HP notch ── */
+@media (max-width: 600px) {
+  .page-wrapper {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* ── Loading spinner ── */
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-subtle);
+  border-top-color: var(--accent-gold);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
