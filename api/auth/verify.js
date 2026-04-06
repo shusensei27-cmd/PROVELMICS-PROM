@@ -1,13 +1,7 @@
-// api/auth/verify.js - Supabase JWT verification middleware
 const jwt = require('jsonwebtoken');
 
-const SUPABASE_JWT_SECRET = process.env.SUPABASE_JWT_SECRET;
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'shusensei27@gmail.com';
 
-/**
- * Verify Supabase JWT from Authorization header
- * Returns decoded user payload or throws error
- */
 function verifyToken(req) {
   const authHeader = req.headers['authorization'];
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -16,19 +10,28 @@ function verifyToken(req) {
 
   const token = authHeader.split(' ')[1];
   
+  // Coba decode dulu tanpa verifikasi untuk debug
+  const decoded = jwt.decode(token);
+  if (!decoded) throw new Error('Token tidak bisa di-decode');
+
+  // Ambil secret — coba kedua format
+  let secret = process.env.SUPABASE_JWT_SECRET || '';
+  
+  // Kalau secret berformat base64, decode dulu
   try {
-    const decoded = jwt.verify(token, SUPABASE_JWT_SECRET, {
-      algorithms: ['HS256'],
-    });
-    return decoded;
-  } catch (err) {
-    throw new Error('Invalid or expired token');
+    const buf = Buffer.from(secret, 'base64');
+    // Verifikasi dengan plain secret dulu
+    try {
+      return jwt.verify(token, secret, { algorithms: ['HS256'] });
+    } catch(e1) {
+      // Kalau gagal, coba dengan decoded base64
+      return jwt.verify(token, buf, { algorithms: ['HS256'] });
+    }
+  } catch(e) {
+    throw new Error('Invalid or expired token: ' + e.message);
   }
 }
 
-/**
- * Middleware helper - returns user or sends 401
- */
 function requireAuth(req, res) {
   try {
     const user = verifyToken(req);
@@ -39,20 +42,13 @@ function requireAuth(req, res) {
   }
 }
 
-/**
- * Check if user is admin
- */
 function isAdmin(user) {
   return user?.email === ADMIN_EMAIL;
 }
 
-/**
- * Middleware helper - returns user or sends 403 if not admin
- */
 function requireAdmin(req, res) {
   const user = requireAuth(req, res);
   if (!user) return null;
-  
   if (!isAdmin(user)) {
     res.status(403).json({ error: 'Admin access required' });
     return null;
