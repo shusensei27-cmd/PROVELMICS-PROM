@@ -12,10 +12,6 @@ module.exports = async function handler(req, res) {
   if (!admin) return;
   
   console.log('Admin payload:', JSON.stringify(admin));
-  
-  // ... kode selanjutnya
-  console.log('[DEBUG] Data fetched:', JSON.stringify(data));
-
   if (req.method === 'GET') {
     try {
       const { type = 'pending' } = req.query;
