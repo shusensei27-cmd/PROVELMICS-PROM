@@ -39,32 +39,22 @@ function requireAuth(req, res) {
 }
 
 function isAdmin(user) {
-  const email = (
-    user?.email || 
-    user?.user_metadata?.email || 
-    user?.app_metadata?.email || 
-    ''
-  ).trim().toLowerCase();
-  
-  const adminEmail = (ADMIN_EMAIL || '').trim().toLowerCase();
-  
-  console.log('Email check:', email, '===', adminEmail, ':', email === adminEmail);
-  return email === adminEmail;
+  return user?.email === ADMIN_EMAIL;
 }
+
+/**
+ * Middleware helper - returns user or sends 403 if not admin
+ */
 function requireAdmin(req, res) {
   const user = requireAuth(req, res);
   if (!user) return null;
   
   if (!isAdmin(user)) {
-    const email = user?.email || user?.user_metadata?.email || 'unknown';
-    res.status(403).json({ 
-      error: 'Admin access required',
-      your_email: email,
-      required_email: ADMIN_EMAIL
-    });
+    res.status(403).json({ error: 'Admin access required' });
     return null;
   }
   return user;
 }
 
 module.exports = { verifyToken, requireAuth, requireAdmin, isAdmin, ADMIN_EMAIL };
+
