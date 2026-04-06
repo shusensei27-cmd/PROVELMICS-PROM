@@ -1,4 +1,3 @@
-// api/admin.js - Admin dashboard data
 const { requireAdmin } = require('./auth/verify');
 const { query } = require('./_d1');
 
@@ -16,39 +15,66 @@ module.exports = async function handler(req, res) {
     try {
       const { type = 'pending' } = req.query;
 
-      const [pendingNovels, pendingComics, stats] = await Promise.all([
-        query(
-          `SELECT n.*, u.display_name as author_name, u.email as author_email
-           FROM novels n LEFT JOIN users u ON n.author_id = u.id
-           WHERE n.status = ? ORDER BY n.created_at DESC`,
-          [type]
-        ),
-        query(
-          `SELECT c.*, u.display_name as author_name, u.email as author_email
-           FROM comics c LEFT JOIN users u ON c.author_id = u.id
-           WHERE c.status = ? ORDER BY c.created_at DESC`,
-          [type]
-        ),
-        query(
-          `SELECT
-             (SELECT COUNT(*) FROM users) as total_users,
-             (SELECT COUNT(*) FROM novels WHERE status = 'approved') as approved_novels,
-             (SELECT COUNT(*) FROM novels WHERE status = 'pending') as pending_novels,
-             (SELECT COUNT(*) FROM comics WHERE status = 'approved') as approved_comics,
-             (SELECT COUNT(*) FROM comics WHERE status = 'pending') as pending_comics,
-             (SELECT COUNT(*) FROM ratings) as total_ratings`,
-          []
-        )
-      ]);
+      // Query novels - tanpa JOIN dulu untuk debug
+      const novelsResult = await query(
+        `SELECT n.id, n.title, n.genre, n.status, n.cover_url,
+                n.author_id, n.created_at,
+                u.display_name as author_name,
+                u.email as author_email
+         FROM novels n
+         LEFT JOIN users u ON n.author_id = u.id
+         WHERE n.status = ?
+         ORDER BY n.created_at DESC`,
+        [type]
+      );
+
+      // Query comics
+      const comicsResult = await query(
+        `SELECT c.id, c.title, c.genre, c.status, c.cover_url,
+                c.author_id, c.created_at,
+                u.display_name as author_name,
+                u.email as author_email
+         FROM comics c
+         LEFT JOIN users u ON c.author_id = u.id
+         WHERE c.status = ?
+         ORDER BY c.created_at DESC`,
+        [type]
+      );
+
+      // Query stats
+      const statsResult = await query(
+        `SELECT
+           (SELECT COUNT(*) FROM users) as total_users,
+           (SELECT COUNT(*) FROM novels WHERE status = 'approved') as approved_novels,
+           (SELECT COUNT(*) FROM novels WHERE status = 'pending') as pending_novels,
+           (SELECT COUNT(*) FROM comics WHERE status = 'approved') as approved_comics,
+           (SELECT COUNT(*) FROM comics WHERE status = 'pending') as pending_comics,
+           (SELECT COUNT(*) FROM ratings) as total_ratings`,
+        []
+      );
+
+      const novels = (novelsResult.results || []).map(n => ({
+        ...n,
+        genre: safeParseJSON(n.genre, [])
+      }));
+
+      const comics = (comicsResult.results || []).map(c => ({
+        ...c,
+        genre: safeParseJSON(c.genre, [])
+      }));
 
       return res.status(200).json({
-        novels: pendingNovels.results.map(n => ({ ...n, genre: safeParseJSON(n.genre, []) })),
-        comics: pendingComics.results.map(c => ({ ...c, genre: safeParseJSON(c.genre, []) })),
-        stats: stats.results[0]
+        novels,
+        comics,
+        stats: statsResult.results?.[0] || {}
       });
+
     } catch (err) {
       console.error('Admin error:', err);
-      return res.status(500).json({ error: 'Failed to fetch admin data' });
+      return res.status(500).json({ 
+        error: 'Failed to fetch admin data',
+        detail: err.message 
+      });
     }
   }
 
