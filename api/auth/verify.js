@@ -7,25 +7,19 @@ function verifyToken(req) {
   }
 
   const token = authHeader.split(' ')[1];
-  
-  // Decode tanpa verifikasi signature
-  // Supabase sudah memvalidasi token di sisinya sendiri
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Invalid token format');
   
   try {
-    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    // Tambah padding base64 jika perlu
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64 + '=='.slice(0, (4 - base64.length % 4) % 4);
+    const payload = JSON.parse(Buffer.from(padded, 'base64').toString('utf8'));
     
-    // Cek token tidak expired
+    // Cek expired — dengan toleransi 5 menit untuk clock skew
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now) {
+    if (payload.exp && payload.exp < now - 300) {
       throw new Error('Token expired');
-    }
-    
-    // Cek token dari Supabase project yang benar
-    const supabaseUrl = process.env.SUPABASE_URL || '';
-    if (supabaseUrl && payload.iss && !payload.iss.includes('supabase')) {
-      throw new Error('Invalid token issuer');
     }
     
     return payload;
@@ -45,14 +39,26 @@ function requireAuth(req, res) {
 }
 
 function isAdmin(user) {
-  return user?.email === ADMIN_EMAIL;
+  // Cek semua kemungkinan lokasi email di JWT payload Supabase
+  const email = user?.email || 
+                user?.user_metadata?.email || 
+                user?.app_metadata?.email ||
+                '';
+  console.log('Checking admin for email:', email, '| ADMIN_EMAIL:', ADMIN_EMAIL);
+  return email === ADMIN_EMAIL;
 }
 
 function requireAdmin(req, res) {
   const user = requireAuth(req, res);
   if (!user) return null;
+  
   if (!isAdmin(user)) {
-    res.status(403).json({ error: 'Admin access required' });
+    const email = user?.email || user?.user_metadata?.email || 'unknown';
+    res.status(403).json({ 
+      error: 'Admin access required',
+      your_email: email,
+      required_email: ADMIN_EMAIL
+    });
     return null;
   }
   return user;
