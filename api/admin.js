@@ -12,6 +12,7 @@ module.exports = async function handler(req, res) {
   if (!admin) return;
   
   console.log('Admin payload:', JSON.stringify(admin));
+  
   if (req.method === 'GET') {
     try {
       const { type = 'pending' } = req.query;
@@ -66,19 +67,18 @@ module.exports = async function handler(req, res) {
 
       const stats = statsResult.results?.[0] || {};
 
-      // 🔁 PERUBAHAN HANYA DI SINI: response dibungkus dengan success & data
+      // ✅ Response dengan success flag + data langsung (tanpa wrapper 'data')
       return res.status(200).json({
         success: true,
-        data: {
-          novels,
-          comics,
-          stats
-        }
+        novels,
+        comics,
+        stats
       });
 
     } catch (err) {
       console.error('Admin error:', err);
       return res.status(500).json({ 
+        success: false,
         error: 'Failed to fetch admin data',
         detail: err.message 
       });
