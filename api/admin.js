@@ -10,12 +10,13 @@ module.exports = async function handler(req, res) {
 
   const admin = requireAdmin(req, res);
   if (!admin) return;
+  
+  console.log('Admin payload:', JSON.stringify(admin));
 
   if (req.method === 'GET') {
     try {
       const { type = 'pending' } = req.query;
 
-      // Query novels - tanpa JOIN dulu untuk debug
       const novelsResult = await query(
         `SELECT n.id, n.title, n.genre, n.status, n.cover_url,
                 n.author_id, n.created_at,
@@ -28,7 +29,6 @@ module.exports = async function handler(req, res) {
         [type]
       );
 
-      // Query comics
       const comicsResult = await query(
         `SELECT c.id, c.title, c.genre, c.status, c.cover_url,
                 c.author_id, c.created_at,
@@ -41,7 +41,6 @@ module.exports = async function handler(req, res) {
         [type]
       );
 
-      // Query stats
       const statsResult = await query(
         `SELECT
            (SELECT COUNT(*) FROM users) as total_users,
@@ -63,6 +62,7 @@ module.exports = async function handler(req, res) {
         genre: safeParseJSON(c.genre, [])
       }));
 
+      // ✅ Format response sesuai yang diharapkan app.js
       return res.status(200).json({
         novels,
         comics,
