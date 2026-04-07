@@ -16,7 +16,7 @@ module.exports = async function handler(req, res) {
     try {
       const { type = 'pending' } = req.query;
 
-      // Query novels - tanpa JOIN dulu untuk debug
+      // Query novels
       const novelsResult = await query(
         `SELECT n.id, n.title, n.genre, n.status, n.cover_url,
                 n.author_id, n.created_at,
@@ -64,10 +64,16 @@ module.exports = async function handler(req, res) {
         genre: safeParseJSON(c.genre, [])
       }));
 
+      const stats = statsResult.results?.[0] || {};
+
+      // 🔁 PERUBAHAN HANYA DI SINI: response dibungkus dengan success & data
       return res.status(200).json({
-        novels,
-        comics,
-        stats: statsResult.results?.[0] || {}
+        success: true,
+        data: {
+          novels,
+          comics,
+          stats
+        }
       });
 
     } catch (err) {
