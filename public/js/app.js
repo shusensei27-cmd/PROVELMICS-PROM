@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// PROVELMICS — Main Application JS
+// PROVELMICS — Main Application JS (dengan sistem chapter)
 // ═══════════════════════════════════════════════════════════
 
 // ── Config ──────────────────────────────────────────────────
@@ -101,7 +101,6 @@ function updateAuthUI() {
   const adminLink = document.getElementById('admin-link');
   const mobileAdminLink = document.getElementById('mobile-admin-link');
 
-  // Mobile menu elements
   const mobileUserInfo = document.getElementById('mobile-user-info');
   const mobileActionBtns = document.getElementById('mobile-action-btns');
   const mobileLoginSection = document.getElementById('mobile-login-section');
@@ -110,7 +109,6 @@ function updateAuthUI() {
   const mobileUserEmail = document.getElementById('mobile-user-email');
 
   if (State.user) {
-    // Desktop
     loginBtn && loginBtn.classList.add('hidden');
     userMenu && userMenu.classList.remove('hidden');
 
@@ -120,7 +118,6 @@ function updateAuthUI() {
       userAvatar.style.display = 'block';
     }
 
-    // Mobile menu — tampilkan info user
     mobileUserInfo && mobileUserInfo.classList.remove('hidden');
     mobileActionBtns && mobileActionBtns.classList.remove('hidden');
     if (mobileLoginSection) mobileLoginSection.style.display = 'none';
@@ -135,17 +132,14 @@ function updateAuthUI() {
     if (mobileUserName) mobileUserName.textContent = name;
     if (mobileUserEmail) mobileUserEmail.textContent = email;
 
-    // Admin link
     const isAdmin = State.user.email === CONFIG.ADMIN_EMAIL;
     adminLink && (adminLink.style.display = isAdmin ? 'block' : 'none');
     mobileAdminLink && (mobileAdminLink.style.display = isAdmin ? 'block' : 'none');
 
   } else {
-    // Desktop
     loginBtn && loginBtn.classList.remove('hidden');
     userMenu && userMenu.classList.add('hidden');
 
-    // Mobile menu — tampilkan tombol login
     mobileUserInfo && mobileUserInfo.classList.add('hidden');
     mobileActionBtns && mobileActionBtns.classList.add('hidden');
     if (mobileLoginSection) mobileLoginSection.style.display = 'block';
@@ -503,7 +497,10 @@ async function removeBookmark(content_id, content_type) {
   }
 }
 
-// ── Reader ───────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+// SISTEM CHAPTER BARU (Cover + Daftar Chapter, Upload Chapter)
+// ═══════════════════════════════════════════════════════════
+
 async function loadReader(id, type) {
   const container = document.getElementById('reader-container');
   if (!container) return;
@@ -513,168 +510,211 @@ async function loadReader(id, type) {
     const endpoint = type === 'novel' ? `/novels/${id}` : `/comics/${id}`;
     const data = await api(endpoint);
     const item = data.novel || data.comic;
+    const chapters = data.chapters || [];
 
     if (type === 'novel') {
-      renderNovelReader(item);
+      renderNovelCover(item, chapters);
     } else {
-      renderComicReader(item);
+      renderComicCover(item, chapters);
     }
-
-    if (State.user) {
-      try {
-        const rData = await api(`/ratings?content_id=${id}&content_type=${type}`);
-        setStarRating(rData.rating, id, type);
-      } catch(e) {}
-    }
-
   } catch (e) {
-    container.innerHTML = `<p class="text-muted text-mono">Content not found or still pending approval.</p>`;
+    container.innerHTML = `
+      <div style="padding:3rem;text-align:center">
+        <p class="text-muted text-mono">Konten tidak ditemukan atau masih menunggu persetujuan.</p>
+        <button class="btn btn-outline btn-sm" style="margin-top:1rem" onclick="navigateTo('home')">← Kembali</button>
+      </div>`;
   }
 }
 
-function renderNovelReader(novel) {
+function renderNovelCover(novel, chapters) {
   const container = document.getElementById('reader-container');
-  const chapters = Array.isArray(novel.content) ? novel.content : [{ title: 'Chapter 1', body: novel.content }];
-
-  let currentChapter = 0;
-  const render = (idx) => {
-    const ch = chapters[idx] || chapters[0];
-    const body = typeof ch === 'string' ? ch : (ch.body || ch);
-    container.innerHTML = `
-      <div style="max-width:720px;margin:0 auto;padding:3rem 1rem">
-        <div class="section-header">
-          <div>
-            <span class="section-label">Novel</span>
-            <h2>${novel.title}</h2>
-          </div>
-        </div>
-        <div class="text-mono text-muted mb-4" style="font-size:0.68rem">
-          by ${novel.author_name || 'Unknown'} · Chapter ${idx+1} of ${chapters.length}
-        </div>
-        <div class="divider"></div>
-        <div class="reader-content" id="novel-body">${typeof body === 'string' ? body.split('\n').map(p=>p?`<p>${p}</p>`:'').join('') : ''}</div>
-        <div class="chapter-nav">
-          <button class="btn btn-outline btn-sm" onclick="changeChapter(${idx-1})" ${idx===0?'disabled':''}>← Previous</button>
-          <span class="text-mono text-muted" style="font-size:0.65rem">Ch. ${idx+1} / ${chapters.length}</span>
-          <button class="btn btn-primary btn-sm" onclick="changeChapter(${idx+1})" ${idx===chapters.length-1?'disabled':''}>Next →</button>
-        </div>
-        ${ratingWidgetHTML(novel.id, 'novel', novel.rating_avg, novel.rating_count)}
-        ${bookmarkButtonHTML(novel.id, 'novel')}
-      </div>`;
-
-    if (State.user) {
-      saveProgress(novel.id, idx);
-    }
-  };
-
-  window.changeChapter = (idx) => {
-    if (idx < 0 || idx >= chapters.length) return;
-    currentChapter = idx;
-    render(idx);
-    window.scrollTo(0, 0);
-  };
-
-  render(0);
-}
-
-function renderComicReader(comic) {
-  const container = document.getElementById('reader-container');
-  const images = comic.image_urls || [];
-
+  let allChapters = [];
+  if (chapters && chapters.length > 0) {
+    allChapters = chapters;
+  } else if (novel.content) {
+    const content = typeof novel.content === 'string' ? novel.content : JSON.stringify(novel.content);
+    allChapters = [{ id: 'ch0', chapter_number: 1, title: 'Chapter 1', content }];
+  }
+  const genres = (novel.genre || []).map(g => `<span class="genre-tag">${g}</span>`).join('');
   container.innerHTML = `
     <div style="max-width:800px;margin:0 auto;padding:2rem 1rem">
-      <div class="section-header">
-        <div>
-          <span class="section-label">Comic</span>
-          <h2>${comic.title}</h2>
+      <div style="display:flex;gap:2rem;margin-bottom:3rem;flex-wrap:wrap">
+        <div style="width:200px;flex-shrink:0">
+          ${novel.cover_url ? `<img src="${novel.cover_url}" style="width:100%;aspect-ratio:3/4;object-fit:cover;border:1px solid var(--border-glow);box-shadow:var(--glow-gold)">` : `<div style="width:100%;aspect-ratio:3/4;background:var(--bg-elevated);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;font-size:4rem">📖</div>`}
+        </div>
+        <div style="flex:1;min-width:200px">
+          <span class="section-label">Novel</span>
+          <h2 style="margin:0.3rem 0 0.5rem">${novel.title}</h2>
+          <p style="color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;margin-bottom:0.75rem">oleh ${novel.author_name || novel.pen_name || 'Unknown'}</p>
+          <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:1rem">${genres}</div>
+          ${novel.synopsis ? `<p style="color:var(--text-secondary);font-size:0.95rem;line-height:1.7;margin-bottom:1rem">${novel.synopsis}</p>` : ''}
+          <div style="display:flex;gap:0.5rem;flex-wrap:wrap">
+            <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)">★ ${(novel.rating_avg||0).toFixed(1)} · ${novel.rating_count||0} rating</div>
+            <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)">· ${allChapters.length} chapter</div>
+          </div>
+          <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+            ${allChapters.length > 0 ? `<button class="btn btn-primary" onclick="openNovelChapter('${novel.id}',0,${JSON.stringify(allChapters).replace(/"/g, '&quot;')})">Baca Chapter 1 →</button>` : ''}
+            ${State.user ? `<button class="btn btn-outline btn-sm" id="bookmark-btn-${novel.id}" onclick="toggleBookmark('${novel.id}','novel')">🔖 Bookmark</button>` : ''}
+          </div>
         </div>
       </div>
-      <div class="text-mono text-muted mb-4" style="font-size:0.68rem">
-        by ${comic.author_name || 'Unknown'} · ${images.length} pages
+      ${ratingWidgetHTML(novel.id, 'novel', novel.rating_avg, novel.rating_count)}
+      <div class="divider"></div>
+      <div style="margin-top:1.5rem">
+        <div class="section-header"><span class="section-label">Daftar Chapter</span></div>
+        ${allChapters.length > 0 ? `<div style="display:flex;flex-direction:column;gap:0.4rem">${allChapters.map((ch, idx) => `<div class="pending-item" style="cursor:pointer" onclick="openNovelChapter('${novel.id}',${idx},${JSON.stringify(allChapters).replace(/"/g, '&quot;')})"><div style="flex:1"><div style="font-family:var(--font-display);font-size:0.85rem">Chapter ${ch.chapter_number}: ${ch.title || 'Tanpa Judul'}</div><div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-top:2px">${ch.created_at ? new Date(ch.created_at).toLocaleDateString('id-ID') : ''}</div></div><span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--accent-gold)">Baca →</span></div>`).join('')}</div>` : `<p class="text-muted text-mono">Belum ada chapter.</p>`}
       </div>
-      <div style="display:flex;flex-direction:column;gap:0.5rem;margin:2rem 0">
-        ${images.length
-          ? images.map((url, i) => `<img src="${url}" alt="Page ${i+1}" style="width:100%;display:block;border:1px solid var(--border-subtle)">`).join('')
-          : `<p class="text-muted text-mono text-center" style="padding:3rem">No pages uploaded yet.</p>`}
+    </div>`;
+}
+
+function openNovelChapter(novelId, chapterIdx, chapters) {
+  if (typeof chapters === 'string') { try { chapters = JSON.parse(chapters); } catch { chapters = []; } }
+  const container = document.getElementById('reader-container');
+  const ch = chapters[chapterIdx];
+  if (!ch) return;
+  const body = ch.content || '';
+  container.innerHTML = `
+    <div style="max-width:720px;margin:0 auto;padding:2rem 1rem">
+      <button class="btn btn-outline btn-sm" style="margin-bottom:1.5rem" onclick="loadReader('${novelId}','novel')">← Kembali ke Daftar Chapter</button>
+      <div class="section-header"><div><span class="section-label">Chapter ${ch.chapter_number}</span><h2>${ch.title || 'Chapter ' + ch.chapter_number}</h2></div></div>
+      <div class="divider"></div>
+      <div class="reader-content" style="margin-top:1.5rem">${body.split('\n').map(p => p.trim() ? `<p>${p}</p>` : '').join('')}</div>
+      <div class="chapter-nav" style="margin-top:3rem">
+        <button class="btn btn-outline btn-sm" ${chapterIdx === 0 ? 'disabled' : ''} onclick="openNovelChapter('${novelId}',${chapterIdx-1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">← Chapter Sebelumnya</button>
+        <span class="text-mono text-muted" style="font-size:0.65rem">${chapterIdx+1} / ${chapters.length}</span>
+        <button class="btn btn-primary btn-sm" ${chapterIdx === chapters.length-1 ? 'disabled' : ''} onclick="openNovelChapter('${novelId}',${chapterIdx+1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">Chapter Berikutnya →</button>
+      </div>
+    </div>`;
+  window.scrollTo(0, 0);
+  if (State.user) saveProgress(novelId, chapterIdx);
+}
+
+function renderComicCover(comic, chapters) {
+  const container = document.getElementById('reader-container');
+  const genres = (comic.genre || []).map(g => `<span class="genre-tag">${g}</span>`).join('');
+  let allChapters = [];
+  if (chapters && chapters.length > 0) {
+    allChapters = chapters;
+  } else if (comic.image_urls && comic.image_urls.length > 0) {
+    allChapters = [{ id: 'ch0', chapter_number: 1, title: 'Chapter 1', image_urls: comic.image_urls }];
+  }
+  container.innerHTML = `
+    <div style="max-width:800px;margin:0 auto;padding:2rem 1rem">
+      <div style="display:flex;gap:2rem;margin-bottom:3rem;flex-wrap:wrap">
+        <div style="width:200px;flex-shrink:0">
+          ${comic.cover_url ? `<img src="${comic.cover_url}" style="width:100%;aspect-ratio:3/4;object-fit:cover;border:1px solid var(--border-glow);box-shadow:var(--glow-gold)">` : `<div style="width:100%;aspect-ratio:3/4;background:var(--bg-elevated);border:1px solid var(--border-subtle);display:flex;align-items:center;justify-content:center;font-size:4rem">🖼</div>`}
+        </div>
+        <div style="flex:1;min-width:200px">
+          <span class="section-label">Komik</span>
+          <h2 style="margin:0.3rem 0 0.5rem">${comic.title}</h2>
+          <p style="color:var(--text-secondary);font-family:var(--font-mono);font-size:0.75rem;margin-bottom:0.75rem">oleh ${comic.author_name || comic.pen_name || 'Unknown'}</p>
+          <div style="display:flex;flex-wrap:wrap;gap:0.3rem;margin-bottom:1rem">${genres}</div>
+          ${comic.synopsis ? `<p style="color:var(--text-secondary);font-size:0.95rem;line-height:1.7;margin-bottom:1rem">${comic.synopsis}</p>` : ''}
+          <div style="font-family:var(--font-mono);font-size:0.68rem;color:var(--text-muted)">★ ${(comic.rating_avg||0).toFixed(1)} · ${comic.rating_count||0} rating · ${allChapters.length} chapter</div>
+          <div style="margin-top:1.5rem;display:flex;gap:0.75rem;flex-wrap:wrap">
+            ${allChapters.length > 0 ? `<button class="btn btn-primary" onclick="openComicChapter('${comic.id}',0,${JSON.stringify(allChapters).replace(/"/g, '&quot;')})">Baca Chapter 1 →</button>` : ''}
+            ${State.user ? `<button class="btn btn-outline btn-sm" onclick="toggleBookmark('${comic.id}','comic')">🔖 Bookmark</button>` : ''}
+          </div>
+        </div>
       </div>
       ${ratingWidgetHTML(comic.id, 'comic', comic.rating_avg, comic.rating_count)}
-      ${bookmarkButtonHTML(comic.id, 'comic')}
-    </div>`;
-}
-
-function ratingWidgetHTML(id, type, avg, count) {
-  return `
-    <div class="divider"></div>
-    <div style="padding:1.5rem 0">
-      <div class="section-label" style="margin-bottom:0.75rem">Rate This ${type === 'novel' ? 'Novel' : 'Comic'}</div>
-      <div class="rating-widget" id="rating-widget-${id}">
-        ${[1,2,3,4,5].map(n => `<span class="rating-star" data-val="${n}" onclick="submitRating('${id}','${type}',${n})">★</span>`).join('')}
-      </div>
-      <div class="card-rating mt-2" id="rating-display-${id}">
-        <span class="stars">${starsHTML(avg)}</span>
-        <span class="text-mono" style="font-size:0.68rem">${(avg||0).toFixed(1)} (${count||0} ratings)</span>
+      <div class="divider"></div>
+      <div style="margin-top:1.5rem">
+        <div class="section-header"><span class="section-label">Daftar Chapter</span></div>
+        ${allChapters.length > 0 ? `<div style="display:flex;flex-direction:column;gap:0.4rem">${allChapters.map((ch, idx) => `<div class="pending-item" style="cursor:pointer" onclick="openComicChapter('${comic.id}',${idx},${JSON.stringify(allChapters).replace(/"/g, '&quot;')})"><div style="flex:1"><div style="font-family:var(--font-display);font-size:0.85rem">Chapter ${ch.chapter_number}: ${ch.title || 'Tanpa Judul'}</div><div style="font-family:var(--font-mono);font-size:0.62rem;color:var(--text-muted);margin-top:2px">${Array.isArray(ch.image_urls) ? ch.image_urls.length : 0} halaman${ch.created_at ? ' · ' + new Date(ch.created_at).toLocaleDateString('id-ID') : ''}</div></div><span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--accent-gold)">Baca →</span></div>`).join('')}</div>` : `<p class="text-muted text-mono">Belum ada chapter.</p>`}
       </div>
     </div>`;
 }
 
-function bookmarkButtonHTML(id, type) {
-  if (!State.user) return `<p class="text-mono text-muted" style="font-size:0.68rem">Login to bookmark</p>`;
-  return `
-    <button class="btn btn-outline btn-sm" id="bookmark-btn-${id}" onclick="toggleBookmark('${id}','${type}')">
-      🔖 Bookmark
-    </button>`;
+function openComicChapter(comicId, chapterIdx, chapters) {
+  if (typeof chapters === 'string') { try { chapters = JSON.parse(chapters); } catch { chapters = []; } }
+  const container = document.getElementById('reader-container');
+  const ch = chapters[chapterIdx];
+  if (!ch) return;
+  const images = Array.isArray(ch.image_urls) ? ch.image_urls : [];
+  container.innerHTML = `
+    <div style="max-width:800px;margin:0 auto;padding:2rem 1rem">
+      <button class="btn btn-outline btn-sm" style="margin-bottom:1.5rem" onclick="loadReader('${comicId}','comic')">← Kembali ke Daftar Chapter</button>
+      <div class="section-header"><div><span class="section-label">Chapter ${ch.chapter_number}</span><h2>${ch.title || 'Chapter ' + ch.chapter_number}</h2></div></div>
+      <div style="display:flex;flex-direction:column;gap:4px;margin:1.5rem 0">
+        ${images.length > 0 ? images.map((url, i) => `<img src="${url}" alt="Halaman ${i+1}" style="width:100%;display:block;border:none" loading="lazy" onerror="this.style.display='none'">`).join('') : `<p class="text-muted text-mono text-center" style="padding:3rem">Halaman tidak ditemukan. Pastikan URL gambar benar.</p>`}
+      </div>
+      <div class="chapter-nav">
+        <button class="btn btn-outline btn-sm" ${chapterIdx === 0 ? 'disabled' : ''} onclick="openComicChapter('${comicId}',${chapterIdx-1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">← Chapter Sebelumnya</button>
+        <span class="text-mono text-muted" style="font-size:0.65rem">${chapterIdx+1} / ${chapters.length}</span>
+        <button class="btn btn-primary btn-sm" ${chapterIdx === chapters.length-1 ? 'disabled' : ''} onclick="openComicChapter('${comicId}',${chapterIdx+1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">Chapter Berikutnya →</button>
+      </div>
+    </div>`;
+  window.scrollTo(0, 0);
 }
 
-async function submitRating(contentId, contentType, rating) {
-  if (!State.user) { showToast('Login to rate', 'error'); return; }
-
-  try {
-    const data = await api('/ratings', { method: 'POST', body: { content_id: contentId, content_type: contentType, rating } });
-    showToast('Rating submitted!', 'success');
-    setStarRating(rating, contentId, contentType);
-    const display = document.getElementById(`rating-display-${contentId}`);
-    if (display) {
-      display.innerHTML = `<span class="stars">${starsHTML(data.rating_avg)}</span><span class="text-mono" style="font-size:0.68rem">${data.rating_avg} (${data.rating_count} ratings)</span>`;
-    }
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
-
-function setStarRating(rating, id) {
-  const widget = document.getElementById(`rating-widget-${id}`);
-  if (!widget || !rating) return;
-  widget.querySelectorAll('.rating-star').forEach(s => {
-    s.classList.toggle('filled', parseInt(s.dataset.val) <= rating);
-  });
-}
-
-async function toggleBookmark(contentId, contentType) {
-  try {
-    await api('/bookmarks', { method: 'POST', body: { content_id: contentId, content_type: contentType } });
-    showToast('Bookmarked!', 'success');
-    const btn = document.getElementById(`bookmark-btn-${contentId}`);
-    if (btn) btn.textContent = '🔖 Bookmarked';
-  } catch (e) {
-    showToast(e.message, 'error');
-  }
-}
-
-async function saveProgress(novelId, chapterIndex) {
-  try {
-    await api('/progress', { method: 'POST', body: { novel_id: novelId, chapter_index: chapterIndex } });
-  } catch(e) {}
-}
-
-// ── Upload Page ──────────────────────────────────────────────
-function loadUploadPage() {
+// ── Upload Page dengan History ───────────────────────────────
+async function loadUploadPage() {
   const container = document.getElementById('upload-genres');
   if (!container) return;
   container.innerHTML = GENRES.map(g => `
     <input type="checkbox" class="genre-checkbox" id="genre-${g}" value="${g}" name="genres">
     <label for="genre-${g}">${g}</label>`).join('');
+  if (State.user) await loadUploadHistory();
 }
 
+async function loadUploadHistory() {
+  const historyContainer = document.getElementById('upload-history');
+  if (!historyContainer) return;
+  historyContainer.innerHTML = `<div class="skeleton" style="height:100px"></div>`;
+  try {
+    const userId = State.user.sub || State.user.id;
+    const [novelsData, comicsData] = await Promise.all([
+      api(`/novels?author_id=${userId}&limit=20`),
+      api(`/comics?author_id=${userId}&limit=20`)
+    ]);
+    const myNovels = novelsData.novels || [];
+    const myComics = comicsData.comics || [];
+    if (myNovels.length === 0 && myComics.length === 0) {
+      historyContainer.innerHTML = `<p class="text-muted text-mono" style="padding:1rem 0">Belum ada karya yang diupload.</p>`;
+      return;
+    }
+    historyContainer.innerHTML = `<div style="display:flex;flex-direction:column;gap:0.5rem">
+      ${myNovels.map(n => `<div class="pending-item"><div style="width:36px;height:50px;background:var(--bg-elevated);overflow:hidden;flex-shrink:0">${n.cover_url ? `<img src="${n.cover_url}" style="width:100%;height:100%;object-fit:cover">` : '📖'}</div><div class="pending-item-info"><div class="pending-item-title">${n.title}</div><div class="pending-item-meta">Novel · <span style="color:${n.status==='approved'?'var(--accent-pixel)':n.status==='pending'?'var(--accent-amber)':'var(--accent-ember)'}">${n.status}</span></div></div><div class="pending-actions">${n.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="showAddChapterForm('${n.id}','novel','${n.title}')">+ Chapter</button>` : `<span class="text-mono" style="font-size:0.62rem;color:var(--text-muted)">Menunggu approval</span>`}</div></div>`).join('')}
+      ${myComics.map(c => `<div class="pending-item"><div style="width:36px;height:50px;background:var(--bg-elevated);overflow:hidden;flex-shrink:0">${c.cover_url ? `<img src="${c.cover_url}" style="width:100%;height:100%;object-fit:cover">` : '🖼'}</div><div class="pending-item-info"><div class="pending-item-title">${c.title}</div><div class="pending-item-meta">Komik · <span style="color:${c.status==='approved'?'var(--accent-pixel)':c.status==='pending'?'var(--accent-amber)':'var(--accent-ember)'}">${c.status}</span></div></div><div class="pending-actions">${c.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="showAddChapterForm('${c.id}','comic','${c.title}')">+ Chapter</button>` : `<span class="text-mono" style="font-size:0.62rem;color:var(--text-muted)">Menunggu approval</span>`}</div></div>`).join('')}
+    </div>`;
+  } catch(e) {
+    historyContainer.innerHTML = `<p class="text-muted text-mono">Gagal memuat history.</p>`;
+  }
+}
+
+function showAddChapterForm(contentId, type, title) {
+  const modal = document.getElementById('author-modal');
+  const content = document.getElementById('author-modal-content');
+  content.innerHTML = `<h3 style="margin-bottom:1.5rem">Tambah Chapter Baru</h3><p class="text-mono text-muted" style="font-size:0.7rem;margin-bottom:1.5rem">${type === 'novel' ? '📖' : '🖼'} ${title}</p>
+    <div class="form-group"><label class="form-label">Judul Chapter</label><input class="form-input" id="new-chapter-title" type="text" placeholder="Contoh: Pertemuan Pertama"></div>
+    ${type === 'novel' ? `<div class="form-group"><label class="form-label">Isi Chapter *</label><textarea class="form-textarea" id="new-chapter-content" placeholder="Tulis isi chapter di sini..." style="min-height:250px" required></textarea></div>` : `<div class="form-group"><label class="form-label">URL Gambar (satu per baris) *</label><textarea class="form-textarea" id="new-chapter-images" placeholder="https://raw.githubusercontent.com/.../page1.jpg&#10;https://raw.githubusercontent.com/.../page2.jpg" style="min-height:150px"></textarea></div>`}
+    <div style="display:flex;gap:0.75rem;margin-top:1rem"><button class="btn btn-primary" onclick="submitNewChapter('${contentId}','${type}')">Upload Chapter</button><button class="btn btn-outline" onclick="closeModal('author-modal')">Batal</button></div>`;
+  openModal('author-modal');
+}
+
+async function submitNewChapter(contentId, type) {
+  const title = document.getElementById('new-chapter-title')?.value || '';
+  try {
+    if (type === 'novel') {
+      const content = document.getElementById('new-chapter-content')?.value;
+      if (!content) return showToast('Isi chapter tidak boleh kosong', 'error');
+      await api('/novels/chapters', { method: 'POST', body: { novel_id: contentId, title, content } });
+    } else {
+      const imagesRaw = document.getElementById('new-chapter-images')?.value || '';
+      const image_urls = imagesRaw.split('\n').map(s => s.trim()).filter(Boolean);
+      if (image_urls.length === 0) return showToast('Minimal 1 URL gambar', 'error');
+      await api('/comics/chapters', { method: 'POST', body: { comic_id: contentId, title, image_urls } });
+    }
+    showToast('Chapter berhasil diupload!', 'success');
+    closeModal('author-modal');
+    await loadUploadHistory();
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
+}
+
+// ── Submit Novel / Comic (sama seperti sebelumnya) ───────────
 async function submitNovel(e) {
   e.preventDefault();
   if (!State.user) { showToast('Login required', 'error'); return; }
@@ -723,27 +763,19 @@ async function submitComic(e) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ADMIN PAGE — VERSI DIPERBAIKI (Claude)
+// ADMIN PAGE (tidak berubah)
 // ═══════════════════════════════════════════════════════════
 
-// Helper: render satu item pending (novel/comic)
 function pendingItemHTML(item, type) {
-  const genre = Array.isArray(item.genre) 
-    ? item.genre.join(', ') 
-    : (item.genre || 'Tidak ada genre');
-    
+  const genre = Array.isArray(item.genre) ? item.genre.join(', ') : (item.genre || 'Tidak ada genre');
   return `
     <div class="pending-item" id="pending-${item.id}">
       <div style="width:40px;height:56px;background:var(--bg-elevated);border:1px solid var(--border-subtle);overflow:hidden;flex-shrink:0;border-radius:2px">
-        ${item.cover_url 
-          ? `<img src="${item.cover_url}" style="width:100%;height:100%;object-fit:cover">` 
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.2rem">${type === 'novel' ? '📖' : '🖼'}</div>`}
+        ${item.cover_url ? `<img src="${item.cover_url}" style="width:100%;height:100%;object-fit:cover">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.2rem">${type === 'novel' ? '📖' : '🖼'}</div>`}
       </div>
       <div class="pending-item-info">
         <div class="pending-item-title">${item.title || 'Tanpa Judul'}</div>
-        <div class="pending-item-meta">
-          by ${item.author_name || item.author_id || 'Unknown'} · ${genre}
-        </div>
+        <div class="pending-item-meta">by ${item.author_name || item.author_id || 'Unknown'} · ${genre}</div>
       </div>
       <div class="pending-actions">
         <button class="btn btn-sm btn-ghost" onclick="approveContent('${item.id}','${type}','approve')">✓ Approve</button>
@@ -753,7 +785,6 @@ function pendingItemHTML(item, type) {
     </div>`;
 }
 
-// Fungsi loadAdmin yang sudah diperbaiki (membangun ulang struktur admin)
 async function loadAdmin() {
   if (!State.user || State.user.email !== CONFIG.ADMIN_EMAIL) {
     navigateTo('home');
@@ -772,7 +803,6 @@ async function loadAdmin() {
     const data = await api('/admin?type=pending');
     console.log('Admin data received:', data);
 
-    // Bangun ulang struktur HTML admin
     if (adminContent) {
       adminContent.innerHTML = `
         <div class="admin-stats" id="admin-stats"></div>
@@ -786,7 +816,6 @@ async function loadAdmin() {
         <div class="tab-panel" id="tab-admin-all"><div class="pending-list" id="all-content-list"><p class="text-muted text-mono">Klik tab "All Content" untuk memuat.</p></div></div>`;
     }
 
-    // Render stats
     const s = data.stats || {};
     document.getElementById('admin-stats').innerHTML = `
       <div class="stat-card"><div class="stat-value">${s.total_users || 0}</div><div class="stat-label">Total Users</div></div>
@@ -796,17 +825,11 @@ async function loadAdmin() {
       <div class="stat-card"><div class="stat-value">${s.pending_comics || 0}</div><div class="stat-label">Comics Pending</div></div>
       <div class="stat-card"><div class="stat-value">${s.total_ratings || 0}</div><div class="stat-label">Total Ratings</div></div>`;
 
-    // Render novels
     const novels = data.novels || [];
-    document.getElementById('pending-novels-list').innerHTML = novels.length
-      ? novels.map(item => pendingItemHTML(item, 'novel')).join('')
-      : `<p class="text-muted text-mono" style="padding:1rem 0">Tidak ada novel pending.</p>`;
+    document.getElementById('pending-novels-list').innerHTML = novels.length ? novels.map(item => pendingItemHTML(item, 'novel')).join('') : `<p class="text-muted text-mono" style="padding:1rem 0">Tidak ada novel pending.</p>`;
 
-    // Render comics
     const comics = data.comics || [];
-    document.getElementById('pending-comics-list').innerHTML = comics.length
-      ? comics.map(item => pendingItemHTML(item, 'comic')).join('')
-      : `<p class="text-muted text-mono" style="padding:1rem 0">Tidak ada komik pending.</p>`;
+    document.getElementById('pending-comics-list').innerHTML = comics.length ? comics.map(item => pendingItemHTML(item, 'comic')).join('') : `<p class="text-muted text-mono" style="padding:1rem 0">Tidak ada komik pending.</p>`;
 
   } catch (err) {
     console.error('loadAdmin error:', err);
@@ -816,7 +839,6 @@ async function loadAdmin() {
   }
 }
 
-// Fungsi approveContent dan deleteContent (sudah ada, tidak perlu diubah)
 async function approveContent(id, type, action) {
   try {
     await api(`/${type}s/${id}?action=${action}`, { method: 'PATCH' });
@@ -893,8 +915,7 @@ document.addEventListener('click', (e) => {
 function buildGenreList() {
   const container = document.getElementById('genre-chips');
   if (!container) return;
-  container.innerHTML = GENRES.map(g => `
-    <button class="filter-chip" onclick="navigateTo('genre',{genre:'${g}'})">${g}</button>`).join('');
+  container.innerHTML = GENRES.map(g => `<button class="filter-chip" onclick="navigateTo('genre',{genre:'${g}'})">${g}</button>`).join('');
 }
 
 // ── Utility ──────────────────────────────────────────────────
@@ -903,9 +924,7 @@ function contentCardHTML(item, type) {
   return `
     <div class="content-card" onclick="navigateTo('reader',{id:'${item.id}',type:'${type}'})">
       <div class="card-cover-wrap">
-        ${item.cover_url
-          ? `<img src="${item.cover_url}" class="card-cover" alt="${item.title}" loading="lazy">`
-          : `<div class="card-cover-placeholder">${type === 'novel' ? '📖' : '🖼'}</div>`}
+        ${item.cover_url ? `<img src="${item.cover_url}" class="card-cover" alt="${item.title}" loading="lazy">` : `<div class="card-cover-placeholder">${type === 'novel' ? '📖' : '🖼'}</div>`}
         <div class="card-overlay">
           <div class="card-quick-actions">
             <button class="btn btn-primary btn-sm" onclick="event.stopPropagation();navigateTo('reader',{id:'${item.id}',type:'${type}'})">Read</button>
@@ -965,7 +984,6 @@ function toggleBurger() {
   const btn = document.getElementById('burger-btn');
   const menu = document.getElementById('mobile-menu');
   const overlay = document.getElementById('mobile-overlay');
-
   btn?.classList.toggle('open');
   menu?.classList.toggle('open');
   overlay?.classList.toggle('open');
@@ -1000,10 +1018,8 @@ function toggleMobileSearch() {
 function onMobileSearchInput(e) {
   const q = e.target.value.trim();
   const dropdown = document.getElementById('mobile-search-results');
-
   clearTimeout(searchDebounce);
   if (q.length < 2) { dropdown && dropdown.classList.remove('open'); return; }
-
   searchDebounce = setTimeout(async () => {
     try {
       const data = await api(`/search?q=${encodeURIComponent(q)}`);
@@ -1014,13 +1030,10 @@ function onMobileSearchInput(e) {
   }, 300);
 }
 
-// Close mobile search on outside click
 document.addEventListener('click', (e) => {
   const overlay = document.getElementById('mobile-search-overlay');
   const btn = document.getElementById('mobile-search-btn');
-  if (overlay?.classList.contains('open') &&
-      !overlay.contains(e.target) &&
-      e.target !== btn) {
+  if (overlay?.classList.contains('open') && !overlay.contains(e.target) && e.target !== btn) {
     overlay.classList.remove('open');
   }
 });
