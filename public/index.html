@@ -12,8 +12,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Crimson+Pro:ital,wght@0,300;0,400;0,600;1,300;1,400&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 
-  <!-- Supabase -->
-
   <!-- Styles -->
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/mobile.css">
@@ -23,8 +21,6 @@
 <!-- ═══════════════════════════════════════
      NAVIGATION
 ═══════════════════════════════════════ -->
-<!-- GANTI SELURUH BAGIAN <nav> dan mobile menu di index.html dengan ini -->
-
 <nav class="nav" id="main-nav">
   <a href="#" class="nav-logo" onclick="navigateTo('home')">PROVEL<span>MICS</span></a>
 
@@ -112,7 +108,6 @@
       Sign in with Google
     </button>
   </div>
-
 </div>
 
 <!-- ═══════════════════════════════════════
@@ -293,6 +288,15 @@
             <span class="section-label">Submit Your Work</span>
             <h2>Upload</h2>
           </div>
+        </div>
+
+        <!-- Upload History -->
+        <div id="upload-history-section" class="hidden">
+          <div class="section-header">
+            <span class="section-label">Karya Saya</span>
+          </div>
+          <div id="upload-history"></div>
+          <div class="divider"></div>
         </div>
 
         <div class="tabs" data-tab-group="upload">
@@ -516,7 +520,6 @@
     <span>♪ MUSIC</span>
     <span>▲</span>
   </button>
-  <!-- Replace YOUR_PLAYLIST_ID with your Spotify playlist ID -->
   <iframe
     src="https://open.spotify.com/embed/playlist/37i9dQZF1DX4sWSpwq3LiO?utm_source=generator&theme=0"
     width="280"
