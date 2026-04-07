@@ -10,14 +10,12 @@ module.exports = async function handler(req, res) {
 
   const admin = requireAdmin(req, res);
   if (!admin) return;
-  
-  console.log('Admin payload:', JSON.stringify(admin));
-  
+
   if (req.method === 'GET') {
     try {
       const { type = 'pending' } = req.query;
 
-      // Query novels
+      // Query novels - tanpa JOIN dulu untuk debug
       const novelsResult = await query(
         `SELECT n.id, n.title, n.genre, n.status, n.cover_url,
                 n.author_id, n.created_at,
@@ -65,20 +63,15 @@ module.exports = async function handler(req, res) {
         genre: safeParseJSON(c.genre, [])
       }));
 
-      const stats = statsResult.results?.[0] || {};
-
-      // ✅ Response dengan success flag + data langsung (tanpa wrapper 'data')
       return res.status(200).json({
-        success: true,
         novels,
         comics,
-        stats
+        stats: statsResult.results?.[0] || {}
       });
 
     } catch (err) {
       console.error('Admin error:', err);
       return res.status(500).json({ 
-        success: false,
         error: 'Failed to fetch admin data',
         detail: err.message 
       });
