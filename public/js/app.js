@@ -101,20 +101,55 @@ function updateAuthUI() {
   const adminLink = document.getElementById('admin-link');
   const mobileAdminLink = document.getElementById('mobile-admin-link');
 
+  // Mobile menu elements
+  const mobileUserInfo = document.getElementById('mobile-user-info');
+  const mobileActionBtns = document.getElementById('mobile-action-btns');
+  const mobileLoginSection = document.getElementById('mobile-login-section');
+  const mobileUserAvatar = document.getElementById('mobile-user-avatar');
+  const mobileUserName = document.getElementById('mobile-user-name');
+  const mobileUserEmail = document.getElementById('mobile-user-email');
+
   if (State.user) {
+    // Desktop
     loginBtn && loginBtn.classList.add('hidden');
     userMenu && userMenu.classList.remove('hidden');
+
     const photo = State.dbUser?.photo_url || State.user.user_metadata?.avatar_url;
     if (photo && userAvatar) {
       userAvatar.src = photo;
       userAvatar.style.display = 'block';
     }
+
+    // Mobile menu — tampilkan info user
+    mobileUserInfo && mobileUserInfo.classList.remove('hidden');
+    mobileActionBtns && mobileActionBtns.classList.remove('hidden');
+    if (mobileLoginSection) mobileLoginSection.style.display = 'none';
+
+    if (photo && mobileUserAvatar) {
+      mobileUserAvatar.src = photo;
+      mobileUserAvatar.style.display = 'block';
+    }
+
+    const name = State.dbUser?.display_name || State.user.user_metadata?.full_name || 'User';
+    const email = State.user.email || '';
+    if (mobileUserName) mobileUserName.textContent = name;
+    if (mobileUserEmail) mobileUserEmail.textContent = email;
+
+    // Admin link
     const isAdmin = State.user.email === CONFIG.ADMIN_EMAIL;
     adminLink && (adminLink.style.display = isAdmin ? 'block' : 'none');
     mobileAdminLink && (mobileAdminLink.style.display = isAdmin ? 'block' : 'none');
+
   } else {
+    // Desktop
     loginBtn && loginBtn.classList.remove('hidden');
     userMenu && userMenu.classList.add('hidden');
+
+    // Mobile menu — tampilkan tombol login
+    mobileUserInfo && mobileUserInfo.classList.add('hidden');
+    mobileActionBtns && mobileActionBtns.classList.add('hidden');
+    if (mobileLoginSection) mobileLoginSection.style.display = 'block';
+
     adminLink && (adminLink.style.display = 'none');
     mobileAdminLink && (mobileAdminLink.style.display = 'none');
   }
@@ -687,62 +722,101 @@ async function submitComic(e) {
   }
 }
 
-// ── Admin Page ───────────────────────────────────────────────
-async function loadAdmin() {
-  if (!State.user || State.user.email !== CONFIG.ADMIN_EMAIL) {
-    navigateTo('home');
-    return;
-  }
+// ═══════════════════════════════════════════════════════════
+// ADMIN PAGE — VERSI DIPERBAIKI (Claude)
+// ═══════════════════════════════════════════════════════════
 
-  const container = document.getElementById('admin-content');
-  if (!container) return;
-  container.innerHTML = `<div class="skeleton" style="height:300px"></div>`;
-
-  try {
-    const data = await api('/admin?type=pending');
-    renderAdminStats(data.stats);
-    renderPendingList(data.novels, 'novel', 'pending-novels-list');
-    renderPendingList(data.comics, 'comic', 'pending-comics-list');
-    container.classList.remove('hidden');
-  } catch (e) {
-    container.innerHTML = `<p class="text-muted text-mono">Error loading admin data.</p>`;
-  }
-}
-
-function renderAdminStats(stats) {
-  const s = document.getElementById('admin-stats');
-  if (!s || !stats) return;
-  s.innerHTML = `
-    <div class="stat-card"><div class="stat-value">${stats.total_users||0}</div><div class="stat-label">Total Users</div></div>
-    <div class="stat-card"><div class="stat-value">${stats.approved_novels||0}</div><div class="stat-label">Live Novels</div></div>
-    <div class="stat-card"><div class="stat-value">${stats.pending_novels||0}</div><div class="stat-label">Novels Pending</div></div>
-    <div class="stat-card"><div class="stat-value">${stats.approved_comics||0}</div><div class="stat-label">Live Comics</div></div>
-    <div class="stat-card"><div class="stat-value">${stats.pending_comics||0}</div><div class="stat-label">Comics Pending</div></div>
-    <div class="stat-card"><div class="stat-value">${stats.total_ratings||0}</div><div class="stat-label">Total Ratings</div></div>`;
-}
-
-function renderPendingList(items, type, containerId) {
-  const el = document.getElementById(containerId);
-  if (!el) return;
-  if (!items?.length) { el.innerHTML = `<p class="text-muted text-mono" style="padding:1rem 0">Nothing pending.</p>`; return; }
-
-  el.innerHTML = items.map(item => `
+// Helper: render satu item pending (novel/comic)
+function pendingItemHTML(item, type) {
+  const genre = Array.isArray(item.genre) 
+    ? item.genre.join(', ') 
+    : (item.genre || 'Tidak ada genre');
+    
+  return `
     <div class="pending-item" id="pending-${item.id}">
-      <div style="width:40px;height:56px;background:var(--bg-elevated);border:1px solid var(--border-subtle);overflow:hidden;flex-shrink:0">
-        ${item.cover_url ? `<img src="${item.cover_url}" style="width:100%;height:100%;object-fit:cover">` : ''}
+      <div style="width:40px;height:56px;background:var(--bg-elevated);border:1px solid var(--border-subtle);overflow:hidden;flex-shrink:0;border-radius:2px">
+        ${item.cover_url 
+          ? `<img src="${item.cover_url}" style="width:100%;height:100%;object-fit:cover">` 
+          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:1.2rem">${type === 'novel' ? '📖' : '🖼'}</div>`}
       </div>
       <div class="pending-item-info">
-        <div class="pending-item-title">${item.title}</div>
-        <div class="pending-item-meta">by ${item.author_name||'Unknown'} (${item.author_email||''}) · ${(item.genre||[]).join(', ')||'No genre'}</div>
+        <div class="pending-item-title">${item.title || 'Tanpa Judul'}</div>
+        <div class="pending-item-meta">
+          by ${item.author_name || item.author_id || 'Unknown'} · ${genre}
+        </div>
       </div>
       <div class="pending-actions">
         <button class="btn btn-sm btn-ghost" onclick="approveContent('${item.id}','${type}','approve')">✓ Approve</button>
         <button class="btn btn-sm btn-danger" onclick="approveContent('${item.id}','${type}','reject')">✕ Reject</button>
         <button class="btn btn-sm btn-outline" onclick="deleteContent('${item.id}','${type}')">🗑</button>
       </div>
-    </div>`).join('');
+    </div>`;
 }
 
+// Fungsi loadAdmin yang sudah diperbaiki (membangun ulang struktur admin)
+async function loadAdmin() {
+  if (!State.user || State.user.email !== CONFIG.ADMIN_EMAIL) {
+    navigateTo('home');
+    return;
+  }
+
+  const adminPage = document.getElementById('page-admin');
+  if (!adminPage) return;
+
+  const adminContent = document.getElementById('admin-content');
+  if (adminContent) {
+    adminContent.innerHTML = `<div style="padding:2rem;text-align:center"><div class="loading-spinner" style="margin:0 auto 1rem"></div><p class="text-mono text-muted">Memuat data admin...</p></div>`;
+  }
+
+  try {
+    const data = await api('/admin?type=pending');
+    console.log('Admin data received:', data);
+
+    // Bangun ulang struktur HTML admin
+    if (adminContent) {
+      adminContent.innerHTML = `
+        <div class="admin-stats" id="admin-stats"></div>
+        <div class="tabs" data-tab-group="admin" style="margin-top:2rem">
+          <button class="tab-btn active" data-tab="tab-admin-novels" onclick="switchTab('admin','tab-admin-novels')">Pending Novels</button>
+          <button class="tab-btn" data-tab="tab-admin-comics" onclick="switchTab('admin','tab-admin-comics')">Pending Comics</button>
+          <button class="tab-btn" data-tab="tab-admin-all" onclick="switchTab('admin','tab-admin-all');loadAllContent()">All Content</button>
+        </div>
+        <div class="tab-panel active" id="tab-admin-novels"><div class="pending-list" id="pending-novels-list"></div></div>
+        <div class="tab-panel" id="tab-admin-comics"><div class="pending-list" id="pending-comics-list"></div></div>
+        <div class="tab-panel" id="tab-admin-all"><div class="pending-list" id="all-content-list"><p class="text-muted text-mono">Klik tab "All Content" untuk memuat.</p></div></div>`;
+    }
+
+    // Render stats
+    const s = data.stats || {};
+    document.getElementById('admin-stats').innerHTML = `
+      <div class="stat-card"><div class="stat-value">${s.total_users || 0}</div><div class="stat-label">Total Users</div></div>
+      <div class="stat-card"><div class="stat-value">${s.approved_novels || 0}</div><div class="stat-label">Live Novels</div></div>
+      <div class="stat-card"><div class="stat-value">${s.pending_novels || 0}</div><div class="stat-label">Novels Pending</div></div>
+      <div class="stat-card"><div class="stat-value">${s.approved_comics || 0}</div><div class="stat-label">Live Comics</div></div>
+      <div class="stat-card"><div class="stat-value">${s.pending_comics || 0}</div><div class="stat-label">Comics Pending</div></div>
+      <div class="stat-card"><div class="stat-value">${s.total_ratings || 0}</div><div class="stat-label">Total Ratings</div></div>`;
+
+    // Render novels
+    const novels = data.novels || [];
+    document.getElementById('pending-novels-list').innerHTML = novels.length
+      ? novels.map(item => pendingItemHTML(item, 'novel')).join('')
+      : `<p class="text-muted text-mono" style="padding:1rem 0">Tidak ada novel pending.</p>`;
+
+    // Render comics
+    const comics = data.comics || [];
+    document.getElementById('pending-comics-list').innerHTML = comics.length
+      ? comics.map(item => pendingItemHTML(item, 'comic')).join('')
+      : `<p class="text-muted text-mono" style="padding:1rem 0">Tidak ada komik pending.</p>`;
+
+  } catch (err) {
+    console.error('loadAdmin error:', err);
+    if (adminContent) {
+      adminContent.innerHTML = `<div style="padding:2rem;text-align:center"><p class="text-muted text-mono">Error: ${err.message}</p><button class="btn btn-outline btn-sm" style="margin-top:1rem" onclick="loadAdmin()">Coba Lagi</button></div>`;
+    }
+  }
+}
+
+// Fungsi approveContent dan deleteContent (sudah ada, tidak perlu diubah)
 async function approveContent(id, type, action) {
   try {
     await api(`/${type}s/${id}?action=${action}`, { method: 'PATCH' });
@@ -913,12 +987,6 @@ function switchTab(groupId, tabId) {
   document.getElementById(tabId)?.classList.add('active');
 }
 
-// ── Init ─────────────────────────────────────────────────────
-// ═══════════════════════════════════════════════════════════
-// TAMBAHKAN FUNGSI-FUNGSI INI DI AKHIR app.js
-// (sebelum baris terakhir yang ada DOMContentLoaded)
-// ═══════════════════════════════════════════════════════════
-
 // ── Mobile Search ────────────────────────────────────────────
 function toggleMobileSearch() {
   const overlay = document.getElementById('mobile-search-overlay');
@@ -963,68 +1031,7 @@ window.addEventListener('scroll', () => {
   if (nav) nav.classList.toggle('scrolled', window.scrollY > 20);
 }, { passive: true });
 
-// ── GANTI fungsi updateAuthUI yang lama dengan ini ───────────
-function updateAuthUI() {
-  const loginBtn = document.getElementById('login-btn');
-  const userMenu = document.getElementById('user-menu');
-  const userAvatar = document.getElementById('user-avatar');
-  const adminLink = document.getElementById('admin-link');
-  const mobileAdminLink = document.getElementById('mobile-admin-link');
-
-  // Mobile menu elements
-  const mobileUserInfo = document.getElementById('mobile-user-info');
-  const mobileActionBtns = document.getElementById('mobile-action-btns');
-  const mobileLoginSection = document.getElementById('mobile-login-section');
-  const mobileUserAvatar = document.getElementById('mobile-user-avatar');
-  const mobileUserName = document.getElementById('mobile-user-name');
-  const mobileUserEmail = document.getElementById('mobile-user-email');
-
-  if (State.user) {
-    // Desktop
-    loginBtn && loginBtn.classList.add('hidden');
-    userMenu && userMenu.classList.remove('hidden');
-
-    const photo = State.dbUser?.photo_url || State.user.user_metadata?.avatar_url;
-    if (photo && userAvatar) {
-      userAvatar.src = photo;
-      userAvatar.style.display = 'block';
-    }
-
-    // Mobile menu — tampilkan info user
-    mobileUserInfo && mobileUserInfo.classList.remove('hidden');
-    mobileActionBtns && mobileActionBtns.classList.remove('hidden');
-    if (mobileLoginSection) mobileLoginSection.style.display = 'none';
-
-    if (photo && mobileUserAvatar) {
-      mobileUserAvatar.src = photo;
-      mobileUserAvatar.style.display = 'block';
-    }
-
-    const name = State.dbUser?.display_name || State.user.user_metadata?.full_name || 'User';
-    const email = State.user.email || '';
-    if (mobileUserName) mobileUserName.textContent = name;
-    if (mobileUserEmail) mobileUserEmail.textContent = email;
-
-    // Admin link
-    const isAdmin = State.user.email === CONFIG.ADMIN_EMAIL;
-    adminLink && (adminLink.style.display = isAdmin ? 'block' : 'none');
-    mobileAdminLink && (mobileAdminLink.style.display = isAdmin ? 'block' : 'none');
-
-  } else {
-    // Desktop
-    loginBtn && loginBtn.classList.remove('hidden');
-    userMenu && userMenu.classList.add('hidden');
-
-    // Mobile menu — tampilkan tombol login
-    mobileUserInfo && mobileUserInfo.classList.add('hidden');
-    mobileActionBtns && mobileActionBtns.classList.add('hidden');
-    if (mobileLoginSection) mobileLoginSection.style.display = 'block';
-
-    adminLink && (adminLink.style.display = 'none');
-    mobileAdminLink && (mobileAdminLink.style.display = 'none');
-  }
-}
-
+// ── Init ─────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   initSupabase();
   buildGenreList();
