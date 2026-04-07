@@ -18,7 +18,8 @@ function verifyToken(req) {
     
     // Cek expired — dengan toleransi 5 menit untuk clock skew
     const now = Math.floor(Date.now() / 1000);
-    if (payload.exp && payload.exp < now - 300) {
+    // Toleransi 1 jam untuk clock skew
+    if (payload.exp && payload.exp < now - 3600) {
       throw new Error('Token expired');
     }
     
