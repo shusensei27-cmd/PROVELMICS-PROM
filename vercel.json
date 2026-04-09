@@ -1,16 +1,14 @@
 {
   "version": 2,
-  "routes": [
-    { "src": "/api/novels/chapters", "dest": "/api/novels/index.js" },
-    { "src": "/api/novels/([^/]+)", "dest": "/api/novels/index.js" },
-    { "src": "/api/novels", "dest": "/api/novels/index.js" },
-    { "src": "/api/comics/chapters", "dest": "/api/comics/index.js" },
-    { "src": "/api/comics/([^/]+)", "dest": "/api/comics/index.js" },
-    { "src": "/api/comics", "dest": "/api/comics/index.js" },
-    { "src": "/api/(.*)", "dest": "/api/$1" },
-    { "src": "/css/(.*)", "dest": "/public/css/$1" },
-    { "src": "/js/(.*)", "dest": "/public/js/$1" },
-    { "src": "/", "dest": "/public/index.html" },
-    { "src": ".*", "dest": "/public/index.html" }
+  "rewrites": [
+    { "source": "/api/novels/chapters", "destination": "/api/novels/index.js" },
+    { "source": "/api/novels/:id", "destination": "/api/novels/index.js" },
+    { "source": "/api/novels", "destination": "/api/novels/index.js" },
+    { "source": "/api/comics/chapters", "destination": "/api/comics/index.js" },
+    { "source": "/api/comics/:id", "destination": "/api/comics/index.js" },
+    { "source": "/api/comics", "destination": "/api/comics/index.js" },
+    { "source": "/css/:path*", "destination": "/public/css/:path*" },
+    { "source": "/js/:path*", "destination": "/public/js/:path*" },
+    { "source": "/:path*", "destination": "/public/index.html" }
   ]
 }
