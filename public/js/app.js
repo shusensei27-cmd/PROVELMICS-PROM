@@ -30,7 +30,6 @@ const State = {
 // ── Supabase Init ────────────────────────────────────────────
 let supabaseClient = null;
 
-// PERBAIKAN: tambah clockSkewInSeconds untuk toleransi perbedaan waktu
 function initSupabase() {
   if (window.supabase && CONFIG.SUPABASE_URL !== 'https://YOUR_SUPABASE_PROJECT.supabase.co') {
     supabaseClient = window.supabase.createClient(
@@ -38,7 +37,6 @@ function initSupabase() {
       CONFIG.SUPABASE_ANON_KEY,
       {
         auth: {
-          // Toleransi clock skew 2 jam (7200 detik)
           clockSkewInSeconds: 7200,
           autoRefreshToken: true,
           persistSession: true,
@@ -514,39 +512,75 @@ async function removeBookmark(content_id, content_type) {
 // SISTEM CHAPTER BARU (Cover + Daftar Chapter, Upload Chapter)
 // ═══════════════════════════════════════════════════════════
 
+// ── PERBAIKAN loadReader (menggunakan fetch langsung dan logging) ──
 async function loadReader(id, type) {
   const container = document.getElementById('reader-container');
   if (!container) return;
   container.innerHTML = `<div class="skeleton" style="height:60vh"></div>`;
 
   try {
-    const endpoint = type === 'novel' ? `/novels/${id}` : `/comics/${id}`;
-    const data = await api(endpoint);
+    const endpoint = type === 'novel' 
+      ? `/novels/${id}` 
+      : `/comics/${id}`;
+    
+    const response = await fetch(`${CONFIG.API_BASE}${endpoint}`, {
+      headers: State.token 
+        ? { 'Authorization': `Bearer ${State.token}` } 
+        : {}
+    });
+    
+    const data = await response.json();
+    console.log('Reader data:', data);
+
+    if (!response.ok) throw new Error(data.error || 'Failed to load');
+
     const item = data.novel || data.comic;
     const chapters = data.chapters || [];
+
+    if (!item) throw new Error('Content not found');
 
     if (type === 'novel') {
       renderNovelCover(item, chapters);
     } else {
       renderComicCover(item, chapters);
     }
+
+    if (State.user && State.token) {
+      try {
+        const rData = await api(`/ratings?content_id=${id}&content_type=${type}`);
+        if (rData.rating) setStarRating(rData.rating, id);
+      } catch(e) {}
+    }
+
   } catch (e) {
+    console.error('loadReader error:', e);
     container.innerHTML = `
       <div style="padding:3rem;text-align:center">
-        <p class="text-muted text-mono">Konten tidak ditemukan atau masih menunggu persetujuan.</p>
-        <button class="btn btn-outline btn-sm" style="margin-top:1rem" onclick="navigateTo('home')">← Kembali</button>
+        <p class="text-muted text-mono">Error: ${e.message}</p>
+        <button class="btn btn-outline btn-sm" style="margin-top:1rem" 
+                onclick="navigateTo('home')">← Kembali</button>
       </div>`;
   }
 }
 
+// ── PERBAIKAN renderNovelCover (fallback ke novel.content jika chapters kosong) ──
 function renderNovelCover(novel, chapters) {
   const container = document.getElementById('reader-container');
+  // Gabungkan chapters dari tabel baru + content lama
   let allChapters = [];
   if (chapters && chapters.length > 0) {
     allChapters = chapters;
   } else if (novel.content) {
-    const content = typeof novel.content === 'string' ? novel.content : JSON.stringify(novel.content);
-    allChapters = [{ id: 'ch0', chapter_number: 1, title: 'Chapter 1', content }];
+    // Fallback ke content lama (untuk novel yang belum punya struktur chapter)
+    const contentStr = typeof novel.content === 'string' 
+      ? novel.content 
+      : JSON.stringify(novel.content);
+    allChapters = [{ 
+      id: 'ch0', 
+      chapter_number: 1, 
+      title: 'Chapter 1', 
+      content: contentStr 
+    }];
   }
   const genres = (novel.genre || []).map(g => `<span class="genre-tag">${g}</span>`).join('');
   container.innerHTML = `
@@ -602,6 +636,7 @@ function openNovelChapter(novelId, chapterIdx, chapters) {
   if (State.user) saveProgress(novelId, chapterIdx);
 }
 
+// ── renderComicCover (dengan fallback serupa) ──
 function renderComicCover(comic, chapters) {
   const container = document.getElementById('reader-container');
   const genres = (comic.genre || []).map(g => `<span class="genre-tag">${g}</span>`).join('');
