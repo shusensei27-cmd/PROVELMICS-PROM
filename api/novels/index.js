@@ -5,27 +5,12 @@
 // GET    /api/novels/:id          → detail novel
 // PATCH  /api/novels/:id          → approve/reject
 // DELETE /api/novels/:id          → hapus novel
-// GET    /api/novels/chapters     → list chapters suatu novel (pakai ?novel_id=)
-// GET    /api/novels/:id/chapters → list chapters suatu novel (RESTful)
+// GET    /api/novels/chapters     → list chapters suatu novel
 // POST   /api/novels/chapters     → upload chapter baru
 
 const { requireAuth, requireAdmin } = require('../auth/verify');
 const { query } = require('../_d1');
 const { v4: uuidv4 } = require('uuid');
-
-// Fungsi untuk mengekstrak ID dari request dengan lebih baik
-function getIdFromRequest(req) {
-  // Prioritas dari query parameter (kecuali nilai 'chapters')
-  if (req.query.id && req.query.id !== 'chapters') return req.query.id;
-  
-  // Ambil dari path URL
-  const url = req.url.split('?')[0];
-  const parts = url.split('/').filter(Boolean);
-  const possibleId = parts[2]; // setelah /api/novels/
-  
-  if (possibleId && possibleId !== 'chapters') return possibleId;
-  return null;
-}
 
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -34,23 +19,29 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // Ekstrak ID dan deteksi apakah request ke chapters
+  // ========== PERBAIKAN: Cara mengambil ID dari URL ==========
+  function getIdFromRequest(req) {
+    // Cek query parameter id, asalkan bukan 'chapters'
+    if (req.query.id && req.query.id !== 'chapters') return req.query.id;
+    // Cek dari path URL
+    const url = req.url.split('?')[0];
+    const parts = url.split('/').filter(Boolean);
+    const possibleId = parts[2];
+    if (possibleId && possibleId !== 'chapters') return possibleId;
+    return null;
+  }
+
   const id = getIdFromRequest(req);
   const isChapters = req.url.includes('/chapters') || req.query.id === 'chapters';
   const action = req.query.action;
+  // ===========================================================
 
-  // ── ROUTE: /api/novels/chapters ATAU /api/novels/:id/chapters ──
+  // ── ROUTE: /api/novels/chapters ──────────────────────────────
   if (isChapters) {
     // GET chapters suatu novel
     if (req.method === 'GET') {
-      // Ambil novel_id dari query param atau dari id (untuk RESTful /:id/chapters)
-      let novelId = req.query.novel_id;
-      if (!novelId && id && !req.url.includes('/chapters?') && !req.query.id) {
-        novelId = id;
-      }
-      if (!novelId) {
-        return res.status(400).json({ error: 'novel_id required (either as query or in URL path)' });
-      }
+      const { novel_id } = req.query;
+      if (!novel_id) return res.status(400).json({ error: 'novel_id required' });
 
       try {
         const result = await query(
@@ -58,7 +49,7 @@ module.exports = async function handler(req, res) {
            FROM novel_chapters
            WHERE novel_id = ?
            ORDER BY chapter_number ASC`,
-          [novelId]
+          [novel_id]
         );
         return res.status(200).json({ chapters: result.results || [] });
       } catch(err) {
@@ -66,7 +57,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // POST chapter baru (hanya lewat /api/novels/chapters)
+    // POST chapter baru
     if (req.method === 'POST') {
       const user = requireAuth(req, res);
       if (!user) return;
