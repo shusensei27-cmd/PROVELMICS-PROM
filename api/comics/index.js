@@ -19,11 +19,9 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // ========== PERBAIKAN: Cara mengambil ID dari URL ==========
+  // ========== Cara mengambil ID dari URL ==========
   function getIdFromRequest(req) {
-    // Cek query parameter id, asalkan bukan 'chapters'
     if (req.query.id && req.query.id !== 'chapters') return req.query.id;
-    // Cek dari path URL
     const url = req.url.split('?')[0];
     const parts = url.split('/').filter(Boolean);
     const possibleId = parts[2];
@@ -248,7 +246,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // POST submit komik baru
+  // POST submit komik baru (dengan pembuatan chapter pertama otomatis)
   if (req.method === 'POST') {
     const user = requireAuth(req, res);
     if (!user) return;
@@ -262,10 +260,19 @@ module.exports = async function handler(req, res) {
       const imagesStr = JSON.stringify(Array.isArray(image_urls) ? image_urls : []);
       const userId = user.sub || user.id;
 
+      // Insert ke tabel comics
       await query(
         `INSERT INTO comics (id, title, synopsis, genre, image_urls, author_id, cover_url, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
         [id, title, synopsis || '', genreStr, imagesStr, userId, cover_url || null]
+      );
+
+      // 🔥 BUAT CHAPTER PERTAMA DI comic_chapters
+      const chapId = uuidv4();
+      await query(
+        `INSERT INTO comic_chapters (id, comic_id, chapter_number, title, image_urls, created_at)
+         VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+        [chapId, id, 1, 'Chapter 1', imagesStr, null]
       );
 
       return res.status(201).json({ message: 'Comic submitted for review', id, status: 'pending' });
