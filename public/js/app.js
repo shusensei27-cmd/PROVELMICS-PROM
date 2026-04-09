@@ -30,9 +30,22 @@ const State = {
 // ── Supabase Init ────────────────────────────────────────────
 let supabaseClient = null;
 
+// PERBAIKAN: tambah clockSkewInSeconds untuk toleransi perbedaan waktu
 function initSupabase() {
   if (window.supabase && CONFIG.SUPABASE_URL !== 'https://YOUR_SUPABASE_PROJECT.supabase.co') {
-    supabaseClient = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient(
+      CONFIG.SUPABASE_URL, 
+      CONFIG.SUPABASE_ANON_KEY,
+      {
+        auth: {
+          // Toleransi clock skew 2 jam (7200 detik)
+          clockSkewInSeconds: 7200,
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: true
+        }
+      }
+    );
     supabaseClient.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         State.user = session.user;
@@ -714,7 +727,7 @@ async function submitNewChapter(contentId, type) {
   }
 }
 
-// ── Submit Novel / Comic (sama seperti sebelumnya) ───────────
+// ── Submit Novel / Comic ─────────────────────────────────────
 async function submitNovel(e) {
   e.preventDefault();
   if (!State.user) { showToast('Login required', 'error'); return; }
@@ -763,7 +776,7 @@ async function submitComic(e) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// ADMIN PAGE (tidak berubah)
+// ADMIN PAGE
 // ═══════════════════════════════════════════════════════════
 
 function pendingItemHTML(item, type) {
