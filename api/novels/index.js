@@ -19,11 +19,9 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // ========== PERBAIKAN: Cara mengambil ID dari URL ==========
+  // ========== Cara mengambil ID dari URL ==========
   function getIdFromRequest(req) {
-    // Cek query parameter id, asalkan bukan 'chapters'
     if (req.query.id && req.query.id !== 'chapters') return req.query.id;
-    // Cek dari path URL
     const url = req.url.split('?')[0];
     const parts = url.split('/').filter(Boolean);
     const possibleId = parts[2];
@@ -241,7 +239,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // POST submit novel baru
+  // POST submit novel baru (dengan pembuatan chapter pertama otomatis)
   if (req.method === 'POST') {
     const user = requireAuth(req, res);
     if (!user) return;
@@ -257,10 +255,19 @@ module.exports = async function handler(req, res) {
       const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
       const userId = user.sub || user.id;
 
+      // Insert ke tabel novels
       await query(
         `INSERT INTO novels (id, title, synopsis, genre, content, author_id, cover_url, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
         [id, title, synopsis || '', genreStr, contentStr, userId, cover_url || null]
+      );
+
+      // 🔥 BUAT CHAPTER PERTAMA DI novel_chapters
+      const chapId = uuidv4();
+      await query(
+        `INSERT INTO novel_chapters (id, novel_id, chapter_number, title, content, created_at)
+         VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+        [chapId, id, 1, 'Chapter 1', contentStr, null]
       );
 
       return res.status(201).json({
