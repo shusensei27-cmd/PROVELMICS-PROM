@@ -281,6 +281,22 @@
 
   <!-- ════════════ UPLOAD PAGE ════════════ -->
   <div class="page" id="page-upload">
+    <!-- Karya Saya / History Upload -->
+    <section class="section-sm" id="my-works-section" style="display:none">
+      <div class="container" style="max-width:760px">
+        <div class="section-header">
+          <div>
+            <span class="section-label">Karya Saya</span>
+            <h2>Lanjut Upload Chapter</h2>
+          </div>
+        </div>
+        <p class="text-mono text-muted" style="font-size:0.72rem;margin-bottom:1.5rem">
+          Pilih karya yang sudah approved untuk menambah chapter baru
+        </p>
+        <div id="upload-history"></div>
+      </div>
+    </section>
+
     <section class="section-sm">
       <div class="container" style="max-width:760px">
         <div class="section-header">
@@ -288,15 +304,6 @@
             <span class="section-label">Submit Your Work</span>
             <h2>Upload</h2>
           </div>
-        </div>
-
-        <!-- Upload History -->
-        <div id="upload-history-section" class="hidden">
-          <div class="section-header">
-            <span class="section-label">Karya Saya</span>
-          </div>
-          <div id="upload-history"></div>
-          <div class="divider"></div>
         </div>
 
         <div class="tabs" data-tab-group="upload">
@@ -508,6 +515,53 @@
   <div class="modal" style="max-width:800px;max-height:85vh;overflow-y:auto">
     <button class="modal-close" onclick="closeModal('author-modal')">✕</button>
     <div id="author-modal-content"></div>
+  </div>
+</div>
+
+<!-- Modal Tambah Chapter -->
+<div class="modal-backdrop" id="add-chapter-modal">
+  <div class="modal" style="max-width:640px">
+    <button class="modal-close" onclick="closeModal('add-chapter-modal')">✕</button>
+    <h3 style="margin-bottom:0.5rem" id="add-chapter-modal-title">Tambah Chapter Baru</h3>
+    <p class="text-mono text-muted" style="font-size:0.7rem;margin-bottom:1.5rem" 
+       id="add-chapter-modal-subtitle"></p>
+    
+    <div class="form-group">
+      <label class="form-label">Judul Chapter</label>
+      <input class="form-input" id="new-chapter-title" type="text" 
+             placeholder="Contoh: Pertemuan Pertama">
+    </div>
+    
+    <div id="chapter-content-field">
+      <div class="form-group">
+        <label class="form-label">Isi Chapter *</label>
+        <textarea class="form-textarea" id="new-chapter-content" 
+                  placeholder="Tulis isi chapter di sini..." 
+                  style="min-height:280px"></textarea>
+      </div>
+    </div>
+    
+    <div id="chapter-images-field" style="display:none">
+      <div class="form-group">
+        <label class="form-label">URL Gambar (satu per baris) *</label>
+        <textarea class="form-textarea" id="new-chapter-images"
+                  placeholder="https://raw.githubusercontent.com/.../page1.jpg&#10;https://raw.githubusercontent.com/.../page2.jpg"
+                  style="min-height:180px"></textarea>
+        <p class="text-mono text-muted mt-1" style="font-size:0.65rem">
+          Upload gambar ke GitHub repo assets dulu, lalu paste URL raw-nya di sini
+        </p>
+      </div>
+    </div>
+    
+    <div style="display:flex;gap:0.75rem;margin-top:1rem">
+      <button class="btn btn-primary" id="submit-chapter-btn" 
+              onclick="submitNewChapter()">
+        Upload Chapter
+      </button>
+      <button class="btn btn-outline" onclick="closeModal('add-chapter-modal')">
+        Batal
+      </button>
+    </div>
   </div>
 </div>
 
