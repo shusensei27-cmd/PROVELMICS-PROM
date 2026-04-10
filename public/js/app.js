@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// PROVELMICS — Main Application JS (dengan sistem chapter)
+// PROVELMICS — Main Application JS (dengan sistem chapter + author add chapter)
 // ═══════════════════════════════════════════════════════════
 
 // ── Config ──────────────────────────────────────────────────
@@ -26,6 +26,9 @@ const State = {
   comics: [],
   searchHistory: JSON.parse(localStorage.getItem('pvm_search_history') || '[]'),
 };
+
+// State untuk form tambah chapter (disimpan di global window)
+let _chapterFormState = { contentId: null, type: null };
 
 // ── Supabase Init ────────────────────────────────────────────
 let supabaseClient = null;
@@ -509,10 +512,9 @@ async function removeBookmark(content_id, content_type) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// SISTEM CHAPTER BARU (Cover + Daftar Chapter, Upload Chapter)
+// SISTEM CHAPTER (Cover + Daftar Chapter, Upload Chapter)
 // ═══════════════════════════════════════════════════════════
 
-// ── loadReader (menggunakan fetch langsung dan logging) ──
 async function loadReader(id, type) {
   const container = document.getElementById('reader-container');
   if (!container) return;
@@ -563,7 +565,6 @@ async function loadReader(id, type) {
   }
 }
 
-// ── renderNovelCover (fallback ke novel.content jika chapters kosong) ──
 function renderNovelCover(novel, chapters) {
   const container = document.getElementById('reader-container');
   let allChapters = [];
@@ -634,7 +635,6 @@ function openNovelChapter(novelId, chapterIdx, chapters) {
   if (State.user) saveProgress(novelId, chapterIdx);
 }
 
-// ── renderComicCover (dengan fallback serupa) ──
 function renderComicCover(comic, chapters) {
   const container = document.getElementById('reader-container');
   const genres = (comic.genre || []).map(g => `<span class="genre-tag">${g}</span>`).join('');
@@ -672,6 +672,7 @@ function renderComicCover(comic, chapters) {
     </div>`;
 }
 
+// ── PERBAIKAN: Hilangkan jarak antar gambar komik ──
 function openComicChapter(comicId, chapterIdx, chapters) {
   if (typeof chapters === 'string') { try { chapters = JSON.parse(chapters); } catch { chapters = []; } }
   const container = document.getElementById('reader-container');
@@ -682,8 +683,8 @@ function openComicChapter(comicId, chapterIdx, chapters) {
     <div style="max-width:800px;margin:0 auto;padding:2rem 1rem">
       <button class="btn btn-outline btn-sm" style="margin-bottom:1.5rem" onclick="loadReader('${comicId}','comic')">← Kembali ke Daftar Chapter</button>
       <div class="section-header"><div><span class="section-label">Chapter ${ch.chapter_number}</span><h2>${ch.title || 'Chapter ' + ch.chapter_number}</h2></div></div>
-      <div style="display:flex;flex-direction:column;gap:4px;margin:1.5rem 0">
-        ${images.length > 0 ? images.map((url, i) => `<img src="${url}" alt="Halaman ${i+1}" style="width:100%;display:block;border:none" loading="lazy" onerror="this.style.display='none'">`).join('') : `<p class="text-muted text-mono text-center" style="padding:3rem">Halaman tidak ditemukan. Pastikan URL gambar benar.</p>`}
+      <div style="display:flex;flex-direction:column;gap:0;margin:0">
+        ${images.length > 0 ? images.map((url, i) => `<img src="${url}" alt="Halaman ${i+1}" style="width:100%;display:block;margin:0;padding:0;border:none;vertical-align:top" loading="lazy" onerror="this.style.display='none'">`).join('') : `<p class="text-muted text-mono text-center" style="padding:3rem">Halaman tidak ditemukan. Pastikan URL gambar benar.</p>`}
       </div>
       <div class="chapter-nav">
         <button class="btn btn-outline btn-sm" ${chapterIdx === 0 ? 'disabled' : ''} onclick="openComicChapter('${comicId}',${chapterIdx-1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">← Chapter Sebelumnya</button>
@@ -772,73 +773,244 @@ async function saveProgress(novelId, chapterIndex) {
   } catch(e) {}
 }
 
-// ── Upload Page dengan History ───────────────────────────────
+// ── Upload Page dengan History (Author dapat tambah chapter) ──
 async function loadUploadPage() {
+  // Isi genre checkboxes untuk form upload
   const container = document.getElementById('upload-genres');
-  if (!container) return;
-  container.innerHTML = GENRES.map(g => `
-    <input type="checkbox" class="genre-checkbox" id="genre-${g}" value="${g}" name="genres">
-    <label for="genre-${g}">${g}</label>`).join('');
-  if (State.user) await loadUploadHistory();
+  if (container) {
+    container.innerHTML = GENRES.map(g => `
+      <input type="checkbox" class="genre-checkbox" id="genre-${g}" value="${g}" name="genres">
+      <label for="genre-${g}">${g}</label>`).join('');
+  }
+
+  // Tampilkan section "Karya Saya" (jika sudah login)
+  const myWorksSection = document.getElementById('my-works-section');
+  if (myWorksSection) {
+    if (State.user) {
+      myWorksSection.style.display = 'block';
+      await loadUploadHistory();
+    } else {
+      myWorksSection.style.display = 'none';
+    }
+  }
 }
 
 async function loadUploadHistory() {
   const historyContainer = document.getElementById('upload-history');
   if (!historyContainer) return;
-  historyContainer.innerHTML = `<div class="skeleton" style="height:100px"></div>`;
+
+  historyContainer.innerHTML = `
+    <div style="display:flex;align-items:center;gap:0.75rem;padding:1rem 0">
+      <div class="loading-spinner"></div>
+      <span class="text-mono text-muted" style="font-size:0.72rem">Memuat karya...</span>
+    </div>`;
+
   try {
-    const userId = State.user.sub || State.user.id;
-    const [novelsData, comicsData] = await Promise.all([
-      api(`/novels?author_id=${userId}&limit=20`),
-      api(`/comics?author_id=${userId}&limit=20`)
-    ]);
-    const myNovels = novelsData.novels || [];
-    const myComics = comicsData.comics || [];
-    if (myNovels.length === 0 && myComics.length === 0) {
-      historyContainer.innerHTML = `<p class="text-muted text-mono" style="padding:1rem 0">Belum ada karya yang diupload.</p>`;
+    const userId = State.user?.sub || State.user?.id;
+    if (!userId) {
+      historyContainer.innerHTML = `<p class="text-muted text-mono">Login untuk melihat karya kamu.</p>`;
       return;
     }
-    historyContainer.innerHTML = `<div style="display:flex;flex-direction:column;gap:0.5rem">
-      ${myNovels.map(n => `<div class="pending-item"><div style="width:36px;height:50px;background:var(--bg-elevated);overflow:hidden;flex-shrink:0">${n.cover_url ? `<img src="${n.cover_url}" style="width:100%;height:100%;object-fit:cover">` : '📖'}</div><div class="pending-item-info"><div class="pending-item-title">${n.title}</div><div class="pending-item-meta">Novel · <span style="color:${n.status==='approved'?'var(--accent-pixel)':n.status==='pending'?'var(--accent-amber)':'var(--accent-ember)'}">${n.status}</span></div></div><div class="pending-actions">${n.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="showAddChapterForm('${n.id}','novel','${n.title}')">+ Chapter</button>` : `<span class="text-mono" style="font-size:0.62rem;color:var(--text-muted)">Menunggu approval</span>`}</div></div>`).join('')}
-      ${myComics.map(c => `<div class="pending-item"><div style="width:36px;height:50px;background:var(--bg-elevated);overflow:hidden;flex-shrink:0">${c.cover_url ? `<img src="${c.cover_url}" style="width:100%;height:100%;object-fit:cover">` : '🖼'}</div><div class="pending-item-info"><div class="pending-item-title">${c.title}</div><div class="pending-item-meta">Komik · <span style="color:${c.status==='approved'?'var(--accent-pixel)':c.status==='pending'?'var(--accent-amber)':'var(--accent-ember)'}">${c.status}</span></div></div><div class="pending-actions">${c.status === 'approved' ? `<button class="btn btn-sm btn-primary" onclick="showAddChapterForm('${c.id}','comic','${c.title}')">+ Chapter</button>` : `<span class="text-mono" style="font-size:0.62rem;color:var(--text-muted)">Menunggu approval</span>`}</div></div>`).join('')}
-    </div>`;
+
+    const [novelsData, comicsData] = await Promise.all([
+      api(`/novels?author_id=${userId}&limit=20`).catch(() => ({ novels: [] })),
+      api(`/comics?author_id=${userId}&limit=20`).catch(() => ({ comics: [] }))
+    ]);
+
+    const myNovels = novelsData.novels || [];
+    const myComics = comicsData.comics || [];
+
+    if (myNovels.length === 0 && myComics.length === 0) {
+      historyContainer.innerHTML = `
+        <div style="padding:2rem;text-align:center;border:1px dashed var(--border-subtle);border-radius:var(--radius-sm)">
+          <p class="text-muted text-mono" style="font-size:0.8rem">
+            Belum ada karya yang diupload.
+          </p>
+          <p class="text-muted text-mono" style="font-size:0.7rem;margin-top:0.5rem">
+            Upload novel atau komik pertamamu di bawah!
+          </p>
+        </div>`;
+      return;
+    }
+
+    const statusColor = (s) => {
+      if (s === 'approved') return 'var(--accent-pixel)';
+      if (s === 'pending') return 'var(--accent-amber)';
+      return 'var(--accent-ember)';
+    };
+    const statusLabel = (s) => {
+      if (s === 'approved') return '✓ Approved';
+      if (s === 'pending') return '⏳ Pending';
+      return '✕ Rejected';
+    };
+
+    historyContainer.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:0.6rem">
+        ${myNovels.map(n => `
+          <div class="pending-item">
+            <div style="width:40px;height:56px;background:var(--bg-elevated);
+                        border:1px solid var(--border-subtle);overflow:hidden;
+                        flex-shrink:0;border-radius:2px">
+              ${n.cover_url 
+                ? `<img src="${n.cover_url}" style="width:100%;height:100%;object-fit:cover">` 
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;
+                              justify-content:center;font-size:1.3rem">📖</div>`}
+            </div>
+            <div class="pending-item-info">
+              <div class="pending-item-title">${n.title}</div>
+              <div class="pending-item-meta" style="display:flex;gap:0.75rem;align-items:center">
+                <span>Novel</span>
+                <span style="color:${statusColor(n.status)};font-size:0.65rem">
+                  ${statusLabel(n.status)}
+                </span>
+              </div>
+            </div>
+            <div class="pending-actions">
+              ${n.status === 'approved' 
+                ? `<button class="btn btn-sm btn-primary" 
+                           onclick="showAddChapterForm('${n.id}','novel','${n.title.replace(/'/g, "\\'")}')">
+                     + Chapter
+                   </button>
+                   <button class="btn btn-sm btn-outline"
+                           onclick="navigateTo('reader',{id:'${n.id}',type:'novel'})">
+                     Lihat
+                   </button>`
+                : `<span class="text-mono" style="font-size:0.62rem;color:var(--text-muted)">
+                     Menunggu review admin
+                   </span>`}
+            </div>
+          </div>`).join('')}
+        ${myComics.map(c => `
+          <div class="pending-item">
+            <div style="width:40px;height:56px;background:var(--bg-elevated);
+                        border:1px solid var(--border-subtle);overflow:hidden;
+                        flex-shrink:0;border-radius:2px">
+              ${c.cover_url 
+                ? `<img src="${c.cover_url}" style="width:100%;height:100%;object-fit:cover">` 
+                : `<div style="width:100%;height:100%;display:flex;align-items:center;
+                              justify-content:center;font-size:1.3rem">🖼</div>`}
+            </div>
+            <div class="pending-item-info">
+              <div class="pending-item-title">${c.title}</div>
+              <div class="pending-item-meta" style="display:flex;gap:0.75rem;align-items:center">
+                <span>Komik</span>
+                <span style="color:${statusColor(c.status)};font-size:0.65rem">
+                  ${statusLabel(c.status)}
+                </span>
+              </div>
+            </div>
+            <div class="pending-actions">
+              ${c.status === 'approved'
+                ? `<button class="btn btn-sm btn-primary"
+                           onclick="showAddChapterForm('${c.id}','comic','${c.title.replace(/'/g, "\\'")}')">
+                     + Chapter
+                   </button>
+                   <button class="btn btn-sm btn-outline"
+                           onclick="navigateTo('reader',{id:'${c.id}',type:'comic'})">
+                     Lihat
+                   </button>`
+                : `<span class="text-mono" style="font-size:0.62rem;color:var(--text-muted)">
+                     Menunggu review admin
+                   </span>`}
+            </div>
+          </div>`).join('')}
+      </div>`;
+
   } catch(e) {
-    historyContainer.innerHTML = `<p class="text-muted text-mono">Gagal memuat history.</p>`;
+    console.error('loadUploadHistory error:', e);
+    historyContainer.innerHTML = `
+      <p class="text-muted text-mono">Gagal memuat history. 
+        <button class="btn btn-ghost btn-sm" onclick="loadUploadHistory()">Coba lagi</button>
+      </p>`;
   }
 }
 
 function showAddChapterForm(contentId, type, title) {
-  const modal = document.getElementById('author-modal');
-  const content = document.getElementById('author-modal-content');
-  content.innerHTML = `<h3 style="margin-bottom:1.5rem">Tambah Chapter Baru</h3><p class="text-mono text-muted" style="font-size:0.7rem;margin-bottom:1.5rem">${type === 'novel' ? '📖' : '🖼'} ${title}</p>
-    <div class="form-group"><label class="form-label">Judul Chapter</label><input class="form-input" id="new-chapter-title" type="text" placeholder="Contoh: Pertemuan Pertama"></div>
-    ${type === 'novel' ? `<div class="form-group"><label class="form-label">Isi Chapter *</label><textarea class="form-textarea" id="new-chapter-content" placeholder="Tulis isi chapter di sini..." style="min-height:250px" required></textarea></div>` : `<div class="form-group"><label class="form-label">URL Gambar (satu per baris) *</label><textarea class="form-textarea" id="new-chapter-images" placeholder="https://raw.githubusercontent.com/.../page1.jpg&#10;https://raw.githubusercontent.com/.../page2.jpg" style="min-height:150px"></textarea></div>`}
-    <div style="display:flex;gap:0.75rem;margin-top:1rem"><button class="btn btn-primary" onclick="submitNewChapter('${contentId}','${type}')">Upload Chapter</button><button class="btn btn-outline" onclick="closeModal('author-modal')">Batal</button></div>`;
-  openModal('author-modal');
+  _chapterFormState = { contentId, type };
+
+  const modalTitle = document.getElementById('add-chapter-modal-title');
+  const modalSubtitle = document.getElementById('add-chapter-modal-subtitle');
+  if (modalTitle) modalTitle.textContent = 'Tambah Chapter Baru';
+  if (modalSubtitle) modalSubtitle.textContent = `${type === 'novel' ? '📖' : '🖼'} ${title}`;
+
+  const contentField = document.getElementById('chapter-content-field');
+  const imagesField = document.getElementById('chapter-images-field');
+  if (type === 'novel') {
+    if (contentField) contentField.style.display = 'block';
+    if (imagesField) imagesField.style.display = 'none';
+  } else {
+    if (contentField) contentField.style.display = 'none';
+    if (imagesField) imagesField.style.display = 'block';
+  }
+
+  // Reset form
+  const titleEl = document.getElementById('new-chapter-title');
+  const contentEl = document.getElementById('new-chapter-content');
+  const imagesEl = document.getElementById('new-chapter-images');
+  if (titleEl) titleEl.value = '';
+  if (contentEl) contentEl.value = '';
+  if (imagesEl) imagesEl.value = '';
+
+  const submitBtn = document.getElementById('submit-chapter-btn');
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Upload Chapter';
+  }
+
+  openModal('add-chapter-modal');
 }
 
-async function submitNewChapter(contentId, type) {
-  const title = document.getElementById('new-chapter-title')?.value || '';
+async function submitNewChapter() {
+  const { contentId, type } = _chapterFormState;
+  if (!contentId || !type) return showToast('Error: form tidak valid', 'error');
+
+  const titleEl = document.getElementById('new-chapter-title');
+  const submitBtn = document.getElementById('submit-chapter-btn');
+  const title = titleEl?.value?.trim() || '';
+
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Mengupload...';
+  }
+
   try {
     if (type === 'novel') {
-      const content = document.getElementById('new-chapter-content')?.value;
-      if (!content) return showToast('Isi chapter tidak boleh kosong', 'error');
-      await api('/novels/chapters', { method: 'POST', body: { novel_id: contentId, title, content } });
+      const content = document.getElementById('new-chapter-content')?.value?.trim();
+      if (!content) {
+        showToast('Isi chapter tidak boleh kosong', 'error');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Upload Chapter'; }
+        return;
+      }
+      await api('/novels/chapters', {
+        method: 'POST',
+        body: { novel_id: contentId, title, content }
+      });
     } else {
       const imagesRaw = document.getElementById('new-chapter-images')?.value || '';
-      const image_urls = imagesRaw.split('\n').map(s => s.trim()).filter(Boolean);
-      if (image_urls.length === 0) return showToast('Minimal 1 URL gambar', 'error');
-      await api('/comics/chapters', { method: 'POST', body: { comic_id: contentId, title, image_urls } });
+      const image_urls = imagesRaw.split('\n').map(s => s.trim()).filter(s => s.startsWith('http'));
+      if (image_urls.length === 0) {
+        showToast('Minimal 1 URL gambar yang valid', 'error');
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Upload Chapter'; }
+        return;
+      }
+      await api('/comics/chapters', {
+        method: 'POST',
+        body: { comic_id: contentId, title, image_urls }
+      });
     }
-    showToast('Chapter berhasil diupload!', 'success');
-    closeModal('author-modal');
+
+    showToast('Chapter berhasil diupload! 🎉', 'success');
+    closeModal('add-chapter-modal');
     await loadUploadHistory();
+
   } catch(e) {
-    showToast(e.message, 'error');
+    console.error('submitNewChapter error:', e);
+    showToast(`Gagal: ${e.message}`, 'error');
+    if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Upload Chapter'; }
   }
 }
 
-// ── Submit Novel / Comic ─────────────────────────────────────
+// ── Submit Novel / Comic (sama seperti sebelumnya) ───────────
 async function submitNovel(e) {
   e.preventDefault();
   if (!State.user) { showToast('Login required', 'error'); return; }
@@ -859,6 +1031,8 @@ async function submitNovel(e) {
     showToast('Novel submitted! Awaiting admin approval.', 'success');
     document.getElementById('upload-novel-form')?.reset();
     if (btn) { btn.disabled = false; btn.textContent = 'Submit for Review'; }
+    // Refresh history jika ada
+    if (State.user) await loadUploadHistory();
   } catch (e) {
     showToast(e.message, 'error');
     const btn = document.getElementById('submit-novel-btn');
@@ -881,13 +1055,14 @@ async function submitComic(e) {
     await api('/comics', { method: 'POST', body: { title, synopsis, cover_url, image_urls, genre } });
     showToast('Comic submitted! Awaiting admin approval.', 'success');
     document.getElementById('upload-comic-form')?.reset();
+    if (State.user) await loadUploadHistory();
   } catch (e) {
     showToast(e.message, 'error');
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-// ADMIN PAGE
+// ADMIN PAGE (tidak berubah)
 // ═══════════════════════════════════════════════════════════
 
 function pendingItemHTML(item, type) {
