@@ -512,7 +512,7 @@ async function removeBookmark(content_id, content_type) {
 // SISTEM CHAPTER BARU (Cover + Daftar Chapter, Upload Chapter)
 // ═══════════════════════════════════════════════════════════
 
-// ── PERBAIKAN loadReader (menggunakan fetch langsung dan logging) ──
+// ── loadReader (menggunakan fetch langsung dan logging) ──
 async function loadReader(id, type) {
   const container = document.getElementById('reader-container');
   if (!container) return;
@@ -563,15 +563,13 @@ async function loadReader(id, type) {
   }
 }
 
-// ── PERBAIKAN renderNovelCover (fallback ke novel.content jika chapters kosong) ──
+// ── renderNovelCover (fallback ke novel.content jika chapters kosong) ──
 function renderNovelCover(novel, chapters) {
   const container = document.getElementById('reader-container');
-  // Gabungkan chapters dari tabel baru + content lama
   let allChapters = [];
   if (chapters && chapters.length > 0) {
     allChapters = chapters;
   } else if (novel.content) {
-    // Fallback ke content lama (untuk novel yang belum punya struktur chapter)
     const contentStr = typeof novel.content === 'string' 
       ? novel.content 
       : JSON.stringify(novel.content);
@@ -694,6 +692,84 @@ function openComicChapter(comicId, chapterIdx, chapters) {
       </div>
     </div>`;
   window.scrollTo(0, 0);
+}
+
+// ── Rating Widget ──────────────────────────────────────────────
+function ratingWidgetHTML(id, type, avg, count) {
+  return `
+    <div class="divider"></div>
+    <div style="padding:1.5rem 0">
+      <div class="section-label" style="margin-bottom:0.75rem">
+        Rate This ${type === 'novel' ? 'Novel' : 'Comic'}
+      </div>
+      <div class="rating-widget" id="rating-widget-${id}">
+        ${[1,2,3,4,5].map(n => 
+          `<span class="rating-star" data-val="${n}" 
+                onclick="submitRating('${id}','${type}',${n})">★</span>`
+        ).join('')}
+      </div>
+      <div class="card-rating mt-2" id="rating-display-${id}">
+        <span class="stars">${starsHTML(avg)}</span>
+        <span class="text-mono" style="font-size:0.68rem">
+          ${(avg||0).toFixed(1)} (${count||0} ratings)
+        </span>
+      </div>
+    </div>`;
+}
+
+function starsHTML(avg) {
+  const filled = Math.round(avg || 0);
+  return '★'.repeat(filled) + '☆'.repeat(5 - filled);
+}
+
+async function submitRating(contentId, contentType, rating) {
+  if (!State.user) { showToast('Login to rate', 'error'); return; }
+
+  try {
+    const data = await api('/ratings', { method: 'POST', body: { content_id: contentId, content_type: contentType, rating } });
+    showToast('Rating submitted!', 'success');
+    setStarRating(rating, contentId, contentType);
+    const display = document.getElementById(`rating-display-${contentId}`);
+    if (display) {
+      display.innerHTML = `<span class="stars">${starsHTML(data.rating_avg)}</span><span class="text-mono" style="font-size:0.68rem">${data.rating_avg} (${data.rating_count} ratings)</span>`;
+    }
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function setStarRating(rating, id) {
+  const widget = document.getElementById(`rating-widget-${id}`);
+  if (!widget || !rating) return;
+  widget.querySelectorAll('.rating-star').forEach(s => {
+    s.classList.toggle('filled', parseInt(s.dataset.val) <= rating);
+  });
+}
+
+// ── Bookmark ──────────────────────────────────────────────────
+async function toggleBookmark(contentId, contentType) {
+  try {
+    await api('/bookmarks', { method: 'POST', body: { content_id: contentId, content_type: contentType } });
+    showToast('Bookmarked!', 'success');
+    const btn = document.getElementById(`bookmark-btn-${contentId}`);
+    if (btn) btn.textContent = '🔖 Bookmarked';
+  } catch (e) {
+    showToast(e.message, 'error');
+  }
+}
+
+function bookmarkButtonHTML(id, type) {
+  if (!State.user) return `<p class="text-mono text-muted" style="font-size:0.68rem">Login to bookmark</p>`;
+  return `
+    <button class="btn btn-outline btn-sm" id="bookmark-btn-${id}" onclick="toggleBookmark('${id}','${type}')">
+      🔖 Bookmark
+    </button>`;
+}
+
+async function saveProgress(novelId, chapterIndex) {
+  try {
+    await api('/progress', { method: 'POST', body: { novel_id: novelId, chapter_index: chapterIndex } });
+  } catch(e) {}
 }
 
 // ── Upload Page dengan History ───────────────────────────────
@@ -991,11 +1067,6 @@ function contentCardHTML(item, type) {
         </div>
       </div>
     </div>`;
-}
-
-function starsHTML(avg) {
-  const filled = Math.round(avg || 0);
-  return '★'.repeat(filled) + '☆'.repeat(5 - filled);
 }
 
 function skeletons(n, cls = '') {
