@@ -19,7 +19,7 @@ module.exports = async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  // ========== Cara mengambil ID dari URL ==========
+  // ── Helper ambil ID dari URL ──────────────────────────────────
   function getIdFromRequest(req) {
     if (req.query.id && req.query.id !== 'chapters') return req.query.id;
     const url = req.url.split('?')[0];
@@ -32,11 +32,11 @@ module.exports = async function handler(req, res) {
   const id = getIdFromRequest(req);
   const isChapters = req.url.includes('/chapters') || req.query.id === 'chapters';
   const action = req.query.action;
-  // ===========================================================
 
   // ── ROUTE: /api/novels/chapters ──────────────────────────────
   if (isChapters) {
-    // GET chapters suatu novel
+
+    // GET - ambil semua chapter dari novel tertentu
     if (req.method === 'GET') {
       const { novel_id } = req.query;
       if (!novel_id) return res.status(400).json({ error: 'novel_id required' });
@@ -50,12 +50,12 @@ module.exports = async function handler(req, res) {
           [novel_id]
         );
         return res.status(200).json({ chapters: result.results || [] });
-      } catch(err) {
+      } catch (err) {
         return res.status(500).json({ error: err.message });
       }
     }
 
-    // POST chapter baru
+    // POST - upload chapter baru ke novel yang sudah ada
     if (req.method === 'POST') {
       const user = requireAuth(req, res);
       if (!user) return;
@@ -66,7 +66,7 @@ module.exports = async function handler(req, res) {
       }
 
       try {
-        // Cek novel milik user ini
+        // Pastikan novel milik user ini
         const novelResult = await query(
           'SELECT id, author_id FROM novels WHERE id = ?',
           [novel_id]
@@ -99,7 +99,7 @@ module.exports = async function handler(req, res) {
           id: chapId,
           chapter_number: chapterNumber
         });
-      } catch(err) {
+      } catch (err) {
         console.error('Upload chapter error:', err);
         return res.status(500).json({ error: err.message });
       }
@@ -110,7 +110,8 @@ module.exports = async function handler(req, res) {
 
   // ── ROUTE: /api/novels/:id ────────────────────────────────────
   if (id) {
-    // GET detail novel
+
+    // GET - detail novel + semua chapters
     if (req.method === 'GET') {
       try {
         const result = await query(
@@ -128,7 +129,7 @@ module.exports = async function handler(req, res) {
         novel.genre = safeParseJSON(novel.genre, []);
         novel.content = safeParseJSON(novel.content, novel.content);
 
-        // Ambil chapters dari tabel novel_chapters
+        // Ambil chapters
         let chapters = [];
         try {
           const chapResult = await query(
@@ -139,7 +140,7 @@ module.exports = async function handler(req, res) {
             [id]
           );
           chapters = chapResult.results || [];
-        } catch(e) {
+        } catch (e) {
           chapters = [];
         }
 
@@ -149,7 +150,7 @@ module.exports = async function handler(req, res) {
       }
     }
 
-    // PATCH approve/reject (admin)
+    // PATCH - approve/reject (admin)
     if (req.method === 'PATCH') {
       if (action === 'approve' || action === 'reject') {
         const admin = requireAdmin(req, res);
@@ -169,7 +170,7 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid action' });
     }
 
-    // DELETE (admin)
+    // DELETE - admin only
     if (req.method === 'DELETE') {
       const admin = requireAdmin(req, res);
       if (!admin) return;
@@ -187,7 +188,8 @@ module.exports = async function handler(req, res) {
   }
 
   // ── ROUTE: /api/novels ────────────────────────────────────────
-  // GET list novels
+
+  // GET - list novels
   if (req.method === 'GET') {
     try {
       const { sort = 'newest', genre, limit = 20, offset = 0, author_id } = req.query;
@@ -196,21 +198,17 @@ module.exports = async function handler(req, res) {
       if (sort === 'rating') orderBy = 'n.rating_avg DESC';
       if (sort === 'az') orderBy = 'n.title ASC';
 
+      // FIX: logika filter author_id yang benar
       let filters = `WHERE n.status = 'approved'`;
       let params = [];
 
-      if (genre) {
+      if (author_id) {
+        // Kalau filter by author, tampilkan semua status milik author tsb
+        filters = `WHERE n.author_id = ?`;
+        params = [author_id];
+      } else if (genre) {
         filters += ` AND n.genre LIKE ?`;
         params.push(`%${genre}%`);
-      }
-
-      if (author_id) {
-        filters += ` AND n.author_id = ?`;
-        params.push(author_id);
-        // Kalau filter author, tampilkan semua status
-        filters = filters.replace(`WHERE n.status = 'approved'`, `WHERE 1=1`);
-        filters += ` AND n.author_id = ?`;
-        params = [author_id];
       }
 
       params.push(parseInt(limit), parseInt(offset));
@@ -239,7 +237,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // ── POST submit novel baru (dengan pembuatan chapter pertama otomatis) ──
+  // POST - submit novel baru + otomatis buat chapter pertama
   if (req.method === 'POST') {
     const user = requireAuth(req, res);
     if (!user) return;
@@ -250,29 +248,29 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'Title and content are required' });
       }
 
-      const id = uuidv4();
+      const novelId = uuidv4();
       const genreStr = JSON.stringify(Array.isArray(genre) ? genre : [genre].filter(Boolean));
       const contentStr = typeof content === 'string' ? content : JSON.stringify(content);
       const userId = user.sub || user.id;
 
-      // Insert ke tabel novels
+      // Simpan ke tabel novels
       await query(
         `INSERT INTO novels (id, title, synopsis, genre, content, author_id, cover_url, status)
          VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')`,
-        [id, title, synopsis || '', genreStr, contentStr, userId, cover_url || null]
+        [novelId, title, synopsis || '', genreStr, contentStr, userId, cover_url || null]
       );
 
-      // 🔥 TAMBAHKAN: Otomatis buat chapter pertama di tabel novel_chapters
+      // Otomatis buat chapter pertama di novel_chapters
       const chapterId = uuidv4();
       await query(
         `INSERT INTO novel_chapters (id, novel_id, chapter_number, title, content, created_at)
          VALUES (?, ?, 1, ?, ?, datetime('now'))`,
-        [chapterId, id, 'Chapter 1', contentStr]
+        [chapterId, novelId, 'Chapter 1', contentStr]
       );
 
       return res.status(201).json({
         message: 'Novel submitted for review',
-        id,
+        id: novelId,
         status: 'pending'
       });
     } catch (err) {
