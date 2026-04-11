@@ -1,12 +1,36 @@
 {
   "version": 2,
   "routes": [
-    { "src": "/api/novels/chapters", "dest": "/api/novels/index.js" },
-    { "src": "/api/novels/([a-zA-Z0-9_-]+)", "dest": "/api/novels/index.js" },
-    { "src": "/api/novels", "dest": "/api/novels/index.js" },
-    { "src": "/api/comics/chapters", "dest": "/api/comics/index.js" },
-    { "src": "/api/comics/([a-zA-Z0-9_-]+)", "dest": "/api/comics/index.js" },
-    { "src": "/api/comics", "dest": "/api/comics/index.js" },
+    {
+      "src": "/api/novels/chapters",
+      "dest": "/api/novels/index.js",
+      "methods": ["GET", "POST", "OPTIONS"]
+    },
+    {
+      "src": "/api/novels/([a-zA-Z0-9_-]+)",
+      "dest": "/api/novels/index.js",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "src": "/api/novels",
+      "dest": "/api/novels/index.js",
+      "methods": ["GET", "POST", "OPTIONS"]
+    },
+    {
+      "src": "/api/comics/chapters",
+      "dest": "/api/comics/index.js",
+      "methods": ["GET", "POST", "OPTIONS"]
+    },
+    {
+      "src": "/api/comics/([a-zA-Z0-9_-]+)",
+      "dest": "/api/comics/index.js",
+      "methods": ["GET", "POST", "PATCH", "DELETE", "OPTIONS"]
+    },
+    {
+      "src": "/api/comics",
+      "dest": "/api/comics/index.js",
+      "methods": ["GET", "POST", "OPTIONS"]
+    },
     { "src": "/api/(.*)", "dest": "/api/$1" },
     { "src": "/css/(.*)", "dest": "/public/css/$1" },
     { "src": "/js/(.*)", "dest": "/public/js/$1" },
