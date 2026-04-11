@@ -170,22 +170,30 @@ module.exports = async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid action' });
     }
 
-    // DELETE - admin only
-    if (req.method === 'DELETE') {
-      const admin = requireAdmin(req, res);
-      if (!admin) return;
+   // DELETE - admin only
+if (req.method === 'DELETE') {
+  const admin = requireAdmin(req, res);
+  if (!admin) return;
 
-      try {
-        await query('DELETE FROM novel_chapters WHERE novel_id = ?', [id]);
-        await query('DELETE FROM novels WHERE id = ?', [id]);
-        return res.status(200).json({ message: 'Novel deleted' });
-      } catch (err) {
-        return res.status(500).json({ error: 'Failed to delete novel' });
-      }
-    }
+  try {
+    // Hapus semua data terkait novel ini dulu sebelum hapus novelnya
+    await query('DELETE FROM novel_chapters WHERE novel_id = ?', [id]);
+    await query('DELETE FROM ratings WHERE content_id = ? AND content_type = ?', [id, 'novel']);
+    await query('DELETE FROM bookmarks WHERE content_id = ? AND content_type = ?', [id, 'novel']);
+    await query('DELETE FROM reading_progress WHERE novel_id = ?', [id]);
 
-    return res.status(405).json({ error: 'Method not allowed' });
+    // Baru hapus novelnya
+    await query('DELETE FROM novels WHERE id = ?', [id]);
+
+    return res.status(200).json({ message: 'Novel deleted' });
+  } catch (err) {
+    console.error('Delete novel error:', err.message);
+    return res.status(500).json({ 
+      error: 'Failed to delete novel',
+      detail: err.message 
+    });
   }
+}
 
   // ── ROUTE: /api/novels ────────────────────────────────────────
 
