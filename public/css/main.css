@@ -1451,6 +1451,88 @@ select.filter-select:focus { border-color: var(--accent-gold); }
   align-items: center;
 }
 
+/* ── Quill Editor & Code Block (TAMBAHAN) ── */
+/* Memperkuat tampilan code block di reader agar lebih kontras */
+.reader-content pre {
+  background: #0a0a0f !important;
+  border-left: 4px solid var(--accent-gold) !important;
+  color: #a5f7a5 !important; /* hijau terang */
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  padding: 1rem;
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  margin: 1.5rem 0;
+  box-shadow: inset 0 0 0 1px rgba(201,168,76,0.2);
+}
+
+/* Gaya untuk inline code (jika ada) */
+.reader-content code {
+  background: var(--bg-elevated);
+  padding: 0.2rem 0.4rem;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  color: var(--accent-teal);
+}
+
+/* Opsional: jika ingin teks code block lebih mencolok dengan warna berbeda */
+.reader-content pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* Penyesuaian Quill editor (dark mode) – jika belum ada di index.html */
+.ql-toolbar.ql-snow {
+  background: var(--bg-elevated);
+  border-color: var(--border-glow);
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+.ql-container.ql-snow {
+  background: var(--bg-surface);
+  border-color: var(--border-glow);
+  border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.ql-editor {
+  min-height: 300px;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.ql-editor.ql-blank::before {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.ql-snow .ql-stroke { stroke: var(--text-secondary); }
+.ql-snow .ql-fill { fill: var(--text-secondary); }
+.ql-snow .ql-picker-label { color: var(--text-secondary); }
+.ql-snow .ql-toolbar button:hover .ql-stroke,
+.ql-snow .ql-toolbar button.ql-active .ql-stroke {
+  stroke: var(--accent-gold);
+}
+.ql-snow .ql-toolbar button:hover .ql-fill,
+.ql-snow .ql-toolbar button.ql-active .ql-fill {
+  fill: var(--accent-gold);
+}
+.ql-snow .ql-toolbar button:hover,
+.ql-snow .ql-toolbar button.ql-active {
+  color: var(--accent-gold);
+}
+.ql-snow .ql-picker-options {
+  background: var(--bg-elevated);
+  border-color: var(--border-glow);
+}
+.ql-snow .ql-picker-item { color: var(--text-secondary); }
+.ql-snow .ql-picker-item:hover { color: var(--accent-gold); }
+
 /* ── Responsive ── */
 @media (max-width: 900px) {
   .nav-links { display: none; }
