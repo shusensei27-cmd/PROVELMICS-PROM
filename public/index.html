@@ -15,6 +15,101 @@
   <!-- Styles -->
   <link rel="stylesheet" href="css/main.css">
   <link rel="stylesheet" href="css/mobile.css">
+
+  <!-- Quill Rich Text Editor -->
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+
+  <style>
+    /* ── Quill Editor Dark Theme ── */
+    .ql-toolbar.ql-snow {
+      background: var(--bg-elevated) !important;
+      border: 1px solid var(--border-glow) !important;
+      border-bottom: none !important;
+      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+    }
+
+    .ql-container.ql-snow {
+      background: var(--bg-surface) !important;
+      border: 1px solid var(--border-glow) !important;
+      border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+      font-family: var(--font-body) !important;
+      font-size: 1rem !important;
+      color: var(--text-primary) !important;
+      min-height: 300px;
+    }
+
+    .ql-editor {
+      min-height: 300px;
+      color: var(--text-primary) !important;
+      font-family: var(--font-body) !important;
+      font-size: 1rem !important;
+      line-height: 1.75 !important;
+    }
+
+    .ql-editor.ql-blank::before {
+      color: var(--text-muted) !important;
+      font-style: italic;
+    }
+
+    .ql-snow .ql-stroke { stroke: var(--text-secondary) !important; }
+    .ql-snow .ql-fill  { fill:   var(--text-secondary) !important; }
+    .ql-snow .ql-picker-label { color: var(--text-secondary) !important; }
+
+    .ql-snow .ql-toolbar button:hover .ql-stroke,
+    .ql-snow .ql-toolbar button.ql-active .ql-stroke {
+      stroke: var(--accent-gold) !important;
+    }
+    .ql-snow .ql-toolbar button:hover .ql-fill,
+    .ql-snow .ql-toolbar button.ql-active .ql-fill {
+      fill: var(--accent-gold) !important;
+    }
+    .ql-snow .ql-toolbar button:hover,
+    .ql-snow .ql-toolbar button.ql-active {
+      color: var(--accent-gold) !important;
+    }
+
+    .ql-snow .ql-picker-options {
+      background: var(--bg-elevated) !important;
+      border: 1px solid var(--border-glow) !important;
+    }
+    .ql-snow .ql-picker-item { color: var(--text-secondary) !important; }
+    .ql-snow .ql-picker-item:hover { color: var(--accent-gold) !important; }
+
+    /* Styling untuk konten yang dirender di reader */
+    .reader-content h1 { font-family: var(--font-display); font-size: 1.8rem; margin: 1.5em 0 0.5em; color: var(--accent-gold); }
+    .reader-content h2 { font-family: var(--font-display); font-size: 1.4rem; margin: 1.3em 0 0.4em; color: var(--text-primary); }
+    .reader-content h3 { font-family: var(--font-display); font-size: 1.1rem; margin: 1.2em 0 0.4em; color: var(--text-primary); }
+    .reader-content p  { margin-bottom: 1em; }
+    .reader-content strong { color: var(--text-primary); font-weight: 700; }
+    .reader-content em { font-style: italic; color: var(--text-secondary); }
+    .reader-content u  { text-decoration: underline; text-underline-offset: 3px; }
+    .reader-content s  { text-decoration: line-through; opacity: 0.6; }
+    .reader-content blockquote {
+      border-left: 3px solid var(--accent-gold);
+      margin: 1.5em 0;
+      padding: 0.5em 1.5em;
+      color: var(--text-secondary);
+      font-style: italic;
+      background: var(--bg-elevated);
+    }
+    .reader-content pre {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-subtle);
+      padding: 1em;
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      overflow-x: auto;
+      margin: 1em 0;
+    }
+    .reader-content ul, .reader-content ol {
+      padding-left: 2em;
+      margin-bottom: 1em;
+    }
+    .reader-content li { margin-bottom: 0.3em; }
+    .reader-content a  { color: var(--accent-teal); }
+  </style>
 </head>
 <body>
 
@@ -331,9 +426,14 @@
               <div class="genre-select-grid" id="upload-genres"></div>
             </div>
             <div class="form-group">
-              <label class="form-label">Content * (Chapters in plain text)</label>
-              <textarea class="form-textarea" id="novel-content" placeholder="Write your chapter content here. Use blank lines between paragraphs..." style="min-height:300px" required></textarea>
-              <p class="text-mono text-muted mt-1" style="font-size:0.65rem">Tip: For multi-chapter support, separate chapters with === CHAPTER TITLE ===</p>
+              <label class="form-label">Content * (Isi Chapter Pertama)</label>
+              <!-- Quill editor akan muncul di sini -->
+              <div id="novel-editor"></div>
+              <!-- Hidden input untuk menyimpan HTML hasil editor -->
+              <input type="hidden" id="novel-content">
+              <p class="text-mono text-muted mt-1" style="font-size:0.65rem">
+                Gunakan toolbar di atas untuk Bold, Italic, Underline, Heading, Quote, dll.
+              </p>
             </div>
             <button class="btn btn-primary w-full" type="submit" id="submit-novel-btn">Submit for Review →</button>
           </form>
@@ -535,9 +635,12 @@
     <div id="chapter-content-field">
       <div class="form-group">
         <label class="form-label">Isi Chapter *</label>
-        <textarea class="form-textarea" id="new-chapter-content" 
-                  placeholder="Tulis isi chapter di sini..." 
-                  style="min-height:280px"></textarea>
+        <!-- Quill editor untuk chapter -->
+        <div id="chapter-editor"></div>
+        <input type="hidden" id="new-chapter-content">
+        <p class="text-mono text-muted mt-1" style="font-size:0.65rem">
+          Gunakan toolbar untuk format teks: Bold, Italic, Heading, Quote, dll.
+        </p>
       </div>
     </div>
     
