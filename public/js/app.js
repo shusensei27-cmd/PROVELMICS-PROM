@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════
-// PROVELMICS — Main Application JS (dengan sistem chapter + author add chapter)
+// PROVELMICS — Main Application JS (dengan Quill Rich Text Editor)
 // ═══════════════════════════════════════════════════════════
 
 // ── Config ──────────────────────────────────────────────────
@@ -26,6 +26,22 @@ const State = {
   comics: [],
   searchHistory: JSON.parse(localStorage.getItem('pvm_search_history') || '[]'),
 };
+
+// ── Quill Toolbar Konfigurasi ────────────────────────────────
+const QUILL_TOOLBAR = [
+  [{ 'header': [1, 2, 3, false] }],
+  ['bold', 'italic', 'underline', 'strike'],
+  ['blockquote', 'code-block'],
+  [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+  [{ 'indent': '-1' }, { 'indent': '+1' }],
+  [{ 'align': [] }],
+  ['link'],
+  ['clean']
+];
+
+// ── Instance Quill Editor ────────────────────────────────────
+let novelQuill = null;
+let chapterQuill = null;
 
 // State untuk form tambah chapter (disimpan di global window)
 let _chapterFormState = { contentId: null, type: null };
@@ -613,24 +629,69 @@ function renderNovelCover(novel, chapters) {
     </div>`;
 }
 
+// ── PERBAIKAN: openNovelChapter dengan dukungan HTML dari Quill ──
 function openNovelChapter(novelId, chapterIdx, chapters) {
-  if (typeof chapters === 'string') { try { chapters = JSON.parse(chapters); } catch { chapters = []; } }
+  if (typeof chapters === 'string') {
+    try { chapters = JSON.parse(chapters); } catch { chapters = []; }
+  }
+
   const container = document.getElementById('reader-container');
   const ch = chapters[chapterIdx];
   if (!ch) return;
-  const body = ch.content || '';
+
+  // Konten bisa berupa HTML (dari Quill) atau plain text (lama)
+  const rawContent = ch.content || '';
+  let renderedContent = '';
+
+  // Deteksi apakah konten adalah HTML atau plain text
+  if (rawContent.trim().startsWith('<')) {
+    // Sudah HTML dari Quill — langsung tampilkan
+    renderedContent = rawContent;
+  } else {
+    // Plain text lama — convert ke paragraf
+    renderedContent = rawContent
+      .split('\n')
+      .map(p => p.trim() ? `<p>${p}</p>` : '')
+      .join('');
+  }
+
   container.innerHTML = `
     <div style="max-width:720px;margin:0 auto;padding:2rem 1rem">
-      <button class="btn btn-outline btn-sm" style="margin-bottom:1.5rem" onclick="loadReader('${novelId}','novel')">← Kembali ke Daftar Chapter</button>
-      <div class="section-header"><div><span class="section-label">Chapter ${ch.chapter_number}</span><h2>${ch.title || 'Chapter ' + ch.chapter_number}</h2></div></div>
+      <button class="btn btn-outline btn-sm" style="margin-bottom:1.5rem"
+              onclick="loadReader('${novelId}','novel')">
+        ← Kembali ke Daftar Chapter
+      </button>
+
+      <div class="section-header">
+        <div>
+          <span class="section-label">Chapter ${ch.chapter_number}</span>
+          <h2>${ch.title || 'Chapter ' + ch.chapter_number}</h2>
+        </div>
+      </div>
+
       <div class="divider"></div>
-      <div class="reader-content" style="margin-top:1.5rem">${body.split('\n').map(p => p.trim() ? `<p>${p}</p>` : '').join('')}</div>
+
+      <div class="reader-content" style="margin-top:1.5rem">
+        ${renderedContent}
+      </div>
+
       <div class="chapter-nav" style="margin-top:3rem">
-        <button class="btn btn-outline btn-sm" ${chapterIdx === 0 ? 'disabled' : ''} onclick="openNovelChapter('${novelId}',${chapterIdx-1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">← Chapter Sebelumnya</button>
-        <span class="text-mono text-muted" style="font-size:0.65rem">${chapterIdx+1} / ${chapters.length}</span>
-        <button class="btn btn-primary btn-sm" ${chapterIdx === chapters.length-1 ? 'disabled' : ''} onclick="openNovelChapter('${novelId}',${chapterIdx+1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">Chapter Berikutnya →</button>
+        <button class="btn btn-outline btn-sm"
+                ${chapterIdx === 0 ? 'disabled' : ''}
+                onclick="openNovelChapter('${novelId}',${chapterIdx - 1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">
+          ← Chapter Sebelumnya
+        </button>
+        <span class="text-mono text-muted" style="font-size:0.65rem">
+          ${chapterIdx + 1} / ${chapters.length}
+        </span>
+        <button class="btn btn-primary btn-sm"
+                ${chapterIdx === chapters.length - 1 ? 'disabled' : ''}
+                onclick="openNovelChapter('${novelId}',${chapterIdx + 1},${JSON.stringify(chapters).replace(/"/g, '&quot;')})">
+          Chapter Berikutnya →
+        </button>
       </div>
     </div>`;
+
   window.scrollTo(0, 0);
   if (State.user) saveProgress(novelId, chapterIdx);
 }
@@ -672,7 +733,7 @@ function renderComicCover(comic, chapters) {
     </div>`;
 }
 
-// ── PERBAIKAN: Hilangkan jarak antar gambar komik ──
+// ── Hilangkan jarak antar gambar komik ──
 function openComicChapter(comicId, chapterIdx, chapters) {
   if (typeof chapters === 'string') { try { chapters = JSON.parse(chapters); } catch { chapters = []; } }
   const container = document.getElementById('reader-container');
@@ -773,7 +834,7 @@ async function saveProgress(novelId, chapterIndex) {
   } catch(e) {}
 }
 
-// ── Upload Page dengan History (Author dapat tambah chapter) ──
+// ── Upload Page dengan History dan Quill Editor ───────────────
 async function loadUploadPage() {
   // Isi genre checkboxes untuk form upload
   const container = document.getElementById('upload-genres');
@@ -783,7 +844,21 @@ async function loadUploadPage() {
       <label for="genre-${g}">${g}</label>`).join('');
   }
 
-  // Tampilkan section "Karya Saya" (jika sudah login)
+  // Inisialisasi Quill editor untuk novel (tunggu DOM siap)
+  setTimeout(() => {
+    const editorEl = document.getElementById('novel-editor');
+    if (editorEl && !novelQuill) {
+      novelQuill = new Quill('#novel-editor', {
+        theme: 'snow',
+        placeholder: 'Tulis isi chapter pertama novelmu di sini...\n\nGunakan toolbar di atas untuk memformat teks.',
+        modules: { toolbar: QUILL_TOOLBAR }
+      });
+    } else if (editorEl && novelQuill) {
+      novelQuill.setContents([]);
+    }
+  }, 100);
+
+  // Tampilkan section "Karya Saya" jika login
   const myWorksSection = document.getElementById('my-works-section');
   if (myWorksSection) {
     if (State.user) {
@@ -925,6 +1000,7 @@ async function loadUploadHistory() {
   }
 }
 
+// ── Show Add Chapter Form (dengan Quill untuk novel) ─────────
 function showAddChapterForm(contentId, type, title) {
   _chapterFormState = { contentId, type };
 
@@ -935,9 +1011,24 @@ function showAddChapterForm(contentId, type, title) {
 
   const contentField = document.getElementById('chapter-content-field');
   const imagesField = document.getElementById('chapter-images-field');
+
   if (type === 'novel') {
     if (contentField) contentField.style.display = 'block';
     if (imagesField) imagesField.style.display = 'none';
+
+    // Inisialisasi Quill editor untuk chapter
+    setTimeout(() => {
+      const editorEl = document.getElementById('chapter-editor');
+      if (editorEl && !chapterQuill) {
+        chapterQuill = new Quill('#chapter-editor', {
+          theme: 'snow',
+          placeholder: 'Tulis isi chapter di sini...',
+          modules: { toolbar: QUILL_TOOLBAR }
+        });
+      } else if (editorEl && chapterQuill) {
+        chapterQuill.setContents([]);
+      }
+    }, 150);
   } else {
     if (contentField) contentField.style.display = 'none';
     if (imagesField) imagesField.style.display = 'block';
@@ -945,10 +1036,8 @@ function showAddChapterForm(contentId, type, title) {
 
   // Reset form
   const titleEl = document.getElementById('new-chapter-title');
-  const contentEl = document.getElementById('new-chapter-content');
   const imagesEl = document.getElementById('new-chapter-images');
   if (titleEl) titleEl.value = '';
-  if (contentEl) contentEl.value = '';
   if (imagesEl) imagesEl.value = '';
 
   const submitBtn = document.getElementById('submit-chapter-btn');
@@ -960,6 +1049,7 @@ function showAddChapterForm(contentId, type, title) {
   openModal('add-chapter-modal');
 }
 
+// ── Submit New Chapter (ambil konten dari Quill untuk novel) ──
 async function submitNewChapter() {
   const { contentId, type } = _chapterFormState;
   if (!contentId || !type) return showToast('Error: form tidak valid', 'error');
@@ -975,12 +1065,21 @@ async function submitNewChapter() {
 
   try {
     if (type === 'novel') {
-      const content = document.getElementById('new-chapter-content')?.value?.trim();
-      if (!content) {
-        showToast('Isi chapter tidak boleh kosong', 'error');
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Upload Chapter'; }
-        return;
+      // Ambil konten dari Quill
+      let content = '';
+      if (chapterQuill) {
+        content = chapterQuill.root.innerHTML;
+        const plainText = chapterQuill.getText().trim();
+        if (!plainText) {
+          showToast('Isi chapter tidak boleh kosong', 'error');
+          if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Upload Chapter'; }
+          return;
+        }
+      } else {
+        // Fallback ke hidden input (jika Quill tidak terinisialisasi)
+        content = document.getElementById('new-chapter-content')?.value?.trim();
       }
+
       await api('/novels/chapters', {
         method: 'POST',
         body: { novel_id: contentId, title, content }
@@ -1001,6 +1100,7 @@ async function submitNewChapter() {
 
     showToast('Chapter berhasil diupload! 🎉', 'success');
     closeModal('add-chapter-modal');
+    if (chapterQuill) chapterQuill.setContents([]);
     await loadUploadHistory();
 
   } catch(e) {
@@ -1010,36 +1110,61 @@ async function submitNewChapter() {
   }
 }
 
-// ── Submit Novel / Comic (sama seperti sebelumnya) ───────────
+// ── Submit Novel (ambil konten dari Quill) ────────────────────
 async function submitNovel(e) {
   e.preventDefault();
   if (!State.user) { showToast('Login required', 'error'); return; }
 
-  const title = document.getElementById('novel-title')?.value;
-  const synopsis = document.getElementById('novel-synopsis')?.value;
-  const content = document.getElementById('novel-content')?.value;
-  const cover_url = document.getElementById('novel-cover')?.value;
+  const title = document.getElementById('novel-title')?.value?.trim();
+  const synopsis = document.getElementById('novel-synopsis')?.value?.trim();
+  const cover_url = document.getElementById('novel-cover')?.value?.trim();
   const genre = [...document.querySelectorAll('.genre-checkbox:checked')].map(c => c.value);
 
-  if (!title || !content) { showToast('Title and content required', 'error'); return; }
+  // Ambil konten dari Quill editor
+  let content = '';
+  if (novelQuill) {
+    content = novelQuill.root.innerHTML;
+    const plainText = novelQuill.getText().trim();
+    if (!plainText) {
+      showToast('Isi chapter tidak boleh kosong', 'error');
+      return;
+    }
+  } else {
+    // Fallback ke hidden input
+    content = document.getElementById('novel-content')?.value?.trim();
+  }
+
+  if (!title) { showToast('Judul tidak boleh kosong', 'error'); return; }
+  if (!content) { showToast('Isi chapter tidak boleh kosong', 'error'); return; }
 
   try {
     const btn = document.getElementById('submit-novel-btn');
     if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
 
-    await api('/novels', { method: 'POST', body: { title, synopsis, content, cover_url, genre } });
+    await api('/novels', {
+      method: 'POST',
+      body: { title, synopsis, content, cover_url, genre }
+    });
+
     showToast('Novel submitted! Awaiting admin approval.', 'success');
-    document.getElementById('upload-novel-form')?.reset();
+
+    // Reset form
+    document.getElementById('novel-title').value = '';
+    document.getElementById('novel-synopsis').value = '';
+    document.getElementById('novel-cover').value = '';
+    if (novelQuill) novelQuill.setContents([]);
+    document.querySelectorAll('.genre-checkbox').forEach(c => c.checked = false);
+
     if (btn) { btn.disabled = false; btn.textContent = 'Submit for Review'; }
-    // Refresh history jika ada
     if (State.user) await loadUploadHistory();
-  } catch (e) {
-    showToast(e.message, 'error');
+  } catch (err) {
+    showToast(err.message, 'error');
     const btn = document.getElementById('submit-novel-btn');
     if (btn) { btn.disabled = false; btn.textContent = 'Submit for Review'; }
   }
 }
 
+// ── Submit Comic (tidak berubah) ──────────────────────────────
 async function submitComic(e) {
   e.preventDefault();
   if (!State.user) { showToast('Login required', 'error'); return; }
