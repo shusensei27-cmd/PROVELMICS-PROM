@@ -194,7 +194,6 @@ if (req.method === 'DELETE') {
       detail: err.message
     });
   }
-}
   // ── ROUTE: /api/novels ────────────────────────────────────────
 
   // GET - list novels
